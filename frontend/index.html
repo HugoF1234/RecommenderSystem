@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Save Eat - Recommandation de Recettes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        coral: '#FF6B6B',
+                        orange: '#FF8E53',
+                        teal: '#06D6A0',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-4">
+            <h1 class="text-2xl font-bold text-coral">🍳 Save Eat</h1>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8 max-w-6xl">
+        <!-- Search Section -->
+        <section class="bg-white rounded-lg shadow-sm p-6 mb-8">
+            <h2 class="text-xl font-bold mb-4 text-gray-800">Ingrédients disponibles</h2>
+            
+            <!-- Ingredients Selection -->
+            <div class="mb-6">
+                <div class="max-h-64 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    <div id="ingredientsContainer" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                        <div class="col-span-full text-center text-gray-500 text-sm py-4">
+                            Chargement des ingrédients...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Time Constraint -->
+            <div class="mb-6">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    Temps maximum (minutes)
+                </label>
+                <input 
+                    type="number" 
+                    id="maxTime" 
+                    placeholder="ex: 30"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-coral focus:border-coral"
+                />
+            </div>
+
+            <!-- Dietary Preferences -->
+            <div class="mb-6">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    Préférences alimentaires
+                </label>
+                <div class="flex flex-wrap gap-3">
+                    <label class="flex items-center space-x-2 px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer">
+                        <input type="checkbox" value="vegetarian" class="dietary-pref rounded text-coral focus:ring-coral">
+                        <span class="text-sm text-gray-700">Végétarien</span>
+                    </label>
+                    <label class="flex items-center space-x-2 px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer">
+                        <input type="checkbox" value="vegan" class="dietary-pref rounded text-coral focus:ring-coral">
+                        <span class="text-sm text-gray-700">Végan</span>
+                    </label>
+                    <label class="flex items-center space-x-2 px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer">
+                        <input type="checkbox" value="gluten-free" class="dietary-pref rounded text-coral focus:ring-coral">
+                        <span class="text-sm text-gray-700">Sans gluten</span>
+                    </label>
+                    <label class="flex items-center space-x-2 px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer">
+                        <input type="checkbox" value="dairy-free" class="dietary-pref rounded text-coral focus:ring-coral">
+                        <span class="text-sm text-gray-700">Sans lactose</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Search Button -->
+            <button 
+                id="searchBtn" 
+                class="w-full bg-gradient-to-r from-coral to-orange text-white font-semibold py-3 px-6 rounded-lg hover:opacity-90 transition-opacity"
+            >
+                Chercher des Recettes
+            </button>
+        </section>
+
+        <!-- Loading State -->
+        <div id="loading" class="hidden text-center py-8">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-coral"></div>
+            <p class="mt-4 text-gray-600">Recherche en cours...</p>
+        </div>
+
+        <!-- Results Section -->
+        <section id="results" class="hidden">
+            <h2 class="text-xl font-bold mb-4 text-gray-800">Recommandations</h2>
+            <div id="recipeGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Recipes will be inserted here -->
+            </div>
+        </section>
+    </main>
+
+    <!-- Recipe Detail Modal -->
+    <div id="recipeModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-gradient-to-r from-coral to-orange text-white p-4 flex items-center justify-between rounded-t-lg">
+                <h2 id="modalRecipeName" class="text-2xl font-bold"></h2>
+                <button onclick="closeRecipeModal()" class="text-white hover:bg-white hover:bg-opacity-20 rounded-full w-8 h-8 flex items-center justify-center text-xl">&times;</button>
+            </div>
+            <div id="modalRecipeContent" class="p-6">
+                <!-- Content will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="static/app.js"></script>
+</body>
+</html>

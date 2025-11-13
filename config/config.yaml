@@ -1,0 +1,76 @@
+# Save Eat Configuration File
+
+# Dataset Configuration
+dataset:
+  name: "foodcom"
+  raw_data_path: "data/raw"
+  processed_data_path: "data/processed"
+  min_user_interactions: 5  # Filter users with less than 5 interactions
+  min_recipe_ratings: 3      # Filter recipes with less than 3 ratings
+  train_ratio: 0.7
+  val_ratio: 0.15
+  test_ratio: 0.15
+
+# Graph Configuration
+graph:
+  node_types: ["user", "recipe", "ingredient"]
+  edge_types: ["user_recipe", "recipe_ingredient"]
+  embedding_dim: 128
+  num_layers: 2
+
+# Model Configuration
+model:
+  gnn:
+    hidden_dim: 256
+    num_layers: 2
+    dropout: 0.3
+    activation: "relu"
+  
+  text_encoder:
+    model_name: "sentence-transformers/all-MiniLM-L6-v2"
+    max_length: 512
+    embedding_dim: 384
+  
+  reranker:
+    hidden_dims: [256, 128, 64]
+    dropout: 0.2
+
+# Training Configuration
+training:
+  batch_size: 512
+  num_epochs: 50
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  early_stopping_patience: 5
+  device: "cuda"  # or "cpu"
+  save_path: "models/checkpoints"
+
+# Evaluation Configuration
+evaluation:
+  metrics: ["ndcg@10", "recall@20", "mrr"]
+  top_k: [10, 20, 50]
+
+# API Configuration
+api:
+  host: "0.0.0.0"
+  port: 8000
+  reload: true
+  max_recommendations: 20
+
+# Database Configuration
+database:
+  type: "sqlite"  # or "postgresql"
+  sqlite_path: "data/saveeat.db"
+  postgresql:
+    host: "localhost"
+    port: 5432
+    database: "saveeat"
+    user: "postgres"
+    password: ""
+
+# Context Configuration
+context:
+  max_available_ingredients: 50
+  time_constraints: [15, 30, 45, 60]  # minutes
+  dietary_preferences: ["vegetarian", "vegan", "gluten-free", "dairy-free"]
+
