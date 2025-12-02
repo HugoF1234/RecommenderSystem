@@ -32,6 +32,17 @@ async function loadIngredients() {
         const data = await response.json();
         const ingredients = data.ingredients || [];
         
+        // Check if there's a message about missing data
+        if (ingredients.length === 0 && data.message) {
+            ingredientsContainer.innerHTML = `<div class="col-span-full text-center text-yellow-600 text-sm py-4">${data.message}</div>`;
+            return;
+        }
+        
+        if (ingredients.length === 0) {
+            ingredientsContainer.innerHTML = '<div class="col-span-full text-center text-gray-500 text-sm py-4">Aucun ingrédient disponible. Veuillez charger les données.</div>';
+            return;
+        }
+        
         ingredientsContainer.innerHTML = '';
         
         ingredients.forEach(ingredient => {

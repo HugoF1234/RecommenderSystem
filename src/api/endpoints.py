@@ -316,21 +316,50 @@ async def get_ingredients(limit: int = 500):
             db_instance = None
         
         if db_instance is None:
-            logger.error("Database not initialized")
-            return {"ingredients": []}
+            logger.warning("Database not initialized - returning empty ingredients list")
+            return {"ingredients": [], "message": "Database not initialized"}
         
         # Get ingredients from database
         ingredients = db_instance.get_all_ingredients(limit=limit)
         
         if not ingredients:
-            logger.warning("No ingredients found in database. Please load data using: python -m src.data.load_to_db")
-            return {"ingredients": []}
+            # Try to auto-load data if CSV files exist
+            from pathlib import Path
+            recipes_path = None
+            possible_paths = [
+                Path("data/raw/recipes_clean_full.csv"),
+                Path("data/raw/recipes.csv"),
+                Path("data/processed/recipes.csv"),
+            ]
+            
+            for path in possible_paths:
+                if path.exists():
+                    recipes_path = path
+                    break
+            
+            if recipes_path:
+                logger.info(f"Auto-loading data from {recipes_path}")
+                try:
+                    db_instance.load_recipes_from_csv(str(recipes_path))
+                    ingredients = db_instance.get_all_ingredients(limit=limit)
+                    if ingredients:
+                        logger.info(f"Successfully loaded {len(ingredients)} ingredients")
+                        return {"ingredients": ingredients}
+                except Exception as e:
+                    logger.error(f"Failed to auto-load data: {e}")
+            
+            # If still no ingredients, return empty list with helpful message
+            logger.warning("No ingredients found in database")
+            return {
+                "ingredients": [],
+                "message": "No data loaded. Please run: python main.py load-db"
+            }
         
         return {"ingredients": ingredients}
         
     except Exception as e:
         logger.error(f"Error getting ingredients: {e}", exc_info=True)
-        return {"ingredients": []}
+        return {"ingredients": [], "error": str(e)}
 
 
 @router.post("/recommend", response_model=RecommendationResponse)
