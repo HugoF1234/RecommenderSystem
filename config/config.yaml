@@ -67,14 +67,14 @@ api:
 
 # Database Configuration
 database:
-  type: "sqlite"  # or "postgresql"
+  type: "postgresql"  # or "sqlite"
   sqlite_path: "data/saveeat.db"
   postgresql:
     host: "localhost"
     port: 5432
     database: "saveeat"
-    user: "postgres"
-    password: ""
+    user: "saveeat_user"
+    password: "saveeat_password"
 
 # Context Configuration
 context:
