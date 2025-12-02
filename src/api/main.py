@@ -67,13 +67,12 @@ async def startup_event():
             with open(config_path, "r") as f:
                 config = yaml.safe_load(f)
             
-            # Initialize database - SQLite by default (works everywhere, no config needed!)
+            # Initialize database
             db_config = config.get("database", {})
-            db_type = db_config.get("type", "sqlite")
             import os
             
-            # Only use PostgreSQL if DATABASE_URL is explicitly set (optional)
-            if os.getenv("DATABASE_URL") and db_type != "sqlite":
+            # Priority: Use PostgreSQL if DATABASE_URL is set (regardless of config.yaml)
+            if os.getenv("DATABASE_URL"):
                 try:
                     from urllib.parse import urlparse
                     db_url = urlparse(os.getenv("DATABASE_URL"))
