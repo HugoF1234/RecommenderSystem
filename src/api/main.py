@@ -67,44 +67,74 @@ async def startup_event():
             with open(config_path, "r") as f:
                 config = yaml.safe_load(f)
             
-            # Initialize database
+            # Initialize database with smart auto-detection
             db_config = config.get("database", {})
-            db_type = db_config.get("type", "sqlite")
-            
-            # Check for environment variables (for Render PostgreSQL)
             import os
-            if os.getenv("DATABASE_URL"):  # Render provides this
-                # Parse DATABASE_URL: postgresql://user:password@host:port/database
-                from urllib.parse import urlparse
-                db_url = urlparse(os.getenv("DATABASE_URL"))
-                db_instance = Database(
-                    database_type="postgresql",
-                    host=db_url.hostname,
-                    port=db_url.port or 5432,
-                    database=db_url.path[1:],  # Remove leading /
-                    user=db_url.username,
-                    password=db_url.password
-                )
-            elif os.getenv("POSTGRESQL_HOST"):  # Custom PostgreSQL config
-                db_instance = Database(
-                    database_type="postgresql",
-                    host=os.getenv("POSTGRESQL_HOST"),
-                    port=int(os.getenv("POSTGRESQL_PORT", "5432")),
-                    database=os.getenv("POSTGRESQL_DATABASE", "saveeat"),
-                    user=os.getenv("POSTGRESQL_USER", "postgres"),
-                    password=os.getenv("POSTGRESQL_PASSWORD", "")
-                )
-            elif db_type == "postgresql":
-                db_instance = Database(
-                    database_type="postgresql",
-                    sqlite_path=db_config.get("sqlite_path", "data/saveeat.db"),
-                    **db_config.get("postgresql", {})
-                )
+            
+            # Priority 1: DATABASE_URL (Render PostgreSQL, Heroku, etc.)
+            if os.getenv("DATABASE_URL"):
+                try:
+                    from urllib.parse import urlparse
+                    db_url = urlparse(os.getenv("DATABASE_URL"))
+                    logger.info(f"Using PostgreSQL from DATABASE_URL: {db_url.hostname}")
+                    db_instance = Database(
+                        database_type="postgresql",
+                        host=db_url.hostname,
+                        port=db_url.port or 5432,
+                        database=db_url.path[1:] if db_url.path else "saveeat",
+                        user=db_url.username,
+                        password=db_url.password
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to connect to PostgreSQL from DATABASE_URL: {e}, falling back to SQLite")
+                    db_instance = Database(
+                        database_type="sqlite",
+                        sqlite_path=db_config.get("sqlite_path", "data/saveeat.db")
+                    )
+            
+            # Priority 2: POSTGRESQL_* environment variables
+            elif os.getenv("POSTGRESQL_HOST"):
+                try:
+                    logger.info(f"Using PostgreSQL from environment variables: {os.getenv('POSTGRESQL_HOST')}")
+                    db_instance = Database(
+                        database_type="postgresql",
+                        host=os.getenv("POSTGRESQL_HOST"),
+                        port=int(os.getenv("POSTGRESQL_PORT", "5432")),
+                        database=os.getenv("POSTGRESQL_DATABASE", "saveeat"),
+                        user=os.getenv("POSTGRESQL_USER", "postgres"),
+                        password=os.getenv("POSTGRESQL_PASSWORD", "")
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to connect to PostgreSQL from env vars: {e}, falling back to SQLite")
+                    db_instance = Database(
+                        database_type="sqlite",
+                        sqlite_path=db_config.get("sqlite_path", "data/saveeat.db")
+                    )
+            
+            # Priority 3: Config file
             else:
-                db_instance = Database(
-                    database_type="sqlite",
-                    sqlite_path=db_config.get("sqlite_path", "data/saveeat.db")
-                )
+                db_type = db_config.get("type", "sqlite")
+                if db_type == "postgresql":
+                    try:
+                        pg_config = db_config.get("postgresql", {})
+                        logger.info(f"Using PostgreSQL from config: {pg_config.get('host', 'localhost')}")
+                        db_instance = Database(
+                            database_type="postgresql",
+                            **pg_config
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to connect to PostgreSQL from config: {e}, falling back to SQLite")
+                        db_instance = Database(
+                            database_type="sqlite",
+                            sqlite_path=db_config.get("sqlite_path", "data/saveeat.db")
+                        )
+                else:
+                    # Default: SQLite (works everywhere, no config needed)
+                    logger.info("Using SQLite database (default)")
+                    db_instance = Database(
+                        database_type="sqlite",
+                        sqlite_path=db_config.get("sqlite_path", "data/saveeat.db")
+                    )
             logger.info("Database initialized")
             
             # Check if database has recipes, if not, try to auto-load from CSV
@@ -155,9 +185,25 @@ async def startup_event():
             else:
                 logger.warning("Model not found - API will run but recommendations won't work")
         else:
-            logger.warning("Config file not found")
-            # Initialize database with defaults
-            db_instance = Database(database_type="sqlite", sqlite_path="data/saveeat.db")
+            logger.warning("Config file not found, using defaults")
+            # Initialize database with smart defaults
+            import os
+            if os.getenv("DATABASE_URL"):
+                try:
+                    from urllib.parse import urlparse
+                    db_url = urlparse(os.getenv("DATABASE_URL"))
+                    db_instance = Database(
+                        database_type="postgresql",
+                        host=db_url.hostname,
+                        port=db_url.port or 5432,
+                        database=db_url.path[1:] if db_url.path else "saveeat",
+                        user=db_url.username,
+                        password=db_url.password
+                    )
+                except:
+                    db_instance = Database(database_type="sqlite", sqlite_path="data/saveeat.db")
+            else:
+                db_instance = Database(database_type="sqlite", sqlite_path="data/saveeat.db")
             
     except Exception as e:
         logger.error(f"Error during startup: {e}", exc_info=True)
