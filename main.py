@@ -33,6 +33,12 @@ def main():
     
     # Load database command
     load_db_parser = subparsers.add_parser("load-db", help="Load CSV data into database")
+    load_db_parser.add_argument("--db-type", type=str, choices=["sqlite", "postgresql"], default="sqlite", help="Database type")
+    load_db_parser.add_argument("--host", type=str, help="PostgreSQL host")
+    load_db_parser.add_argument("--port", type=int, help="PostgreSQL port")
+    load_db_parser.add_argument("--database", type=str, help="PostgreSQL database name")
+    load_db_parser.add_argument("--user", type=str, help="PostgreSQL user")
+    load_db_parser.add_argument("--password", type=str, help="PostgreSQL password")
     
     args = parser.parse_args()
     
@@ -92,15 +98,32 @@ def main():
             print(f"Extract files to: {loader.raw_data_path}")
     
     elif args.command == "load-db":
-        print("Loading data into database...")
-        from src.data.load_to_db import load_data_to_database
-        try:
-            load_data_to_database()
-            print("Data loaded successfully into database!")
-        except Exception as e:
-            print(f"Error loading data: {e}")
-            import traceback
-            traceback.print_exc()
+        print(f"Loading data into {args.db_type} database...")
+        
+        if args.db_type == "postgresql":
+            from scripts.load_to_postgres import load_to_postgres
+            try:
+                load_to_postgres(
+                    host=args.host,
+                    port=args.port,
+                    database=args.database,
+                    user=args.user,
+                    password=args.password
+                )
+                print("Data loaded successfully into PostgreSQL!")
+            except Exception as e:
+                print(f"Error loading data: {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            from src.data.load_to_db import load_data_to_database
+            try:
+                load_data_to_database()
+                print("Data loaded successfully into SQLite!")
+            except Exception as e:
+                print(f"Error loading data: {e}")
+                import traceback
+                traceback.print_exc()
     
     elif args.command == "train":
         print("Training model...")
