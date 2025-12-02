@@ -67,19 +67,17 @@ async def startup_event():
             with open(config_path, "r") as f:
                 config = yaml.safe_load(f)
             
-            # Initialize database from config.yaml
+            # Initialize database - SQLite by default (works everywhere, no config needed!)
             db_config = config.get("database", {})
             db_type = db_config.get("type", "sqlite")
             import os
             
-            db_instance = None
-            
-            # Priority 1: DATABASE_URL (Render PostgreSQL - auto-detected)
-            if os.getenv("DATABASE_URL"):
+            # Only use PostgreSQL if DATABASE_URL is explicitly set (optional)
+            if os.getenv("DATABASE_URL") and db_type != "sqlite":
                 try:
                     from urllib.parse import urlparse
                     db_url = urlparse(os.getenv("DATABASE_URL"))
-                    logger.info(f"Using PostgreSQL from DATABASE_URL (Render): {db_url.hostname}")
+                    logger.info(f"Using PostgreSQL from DATABASE_URL: {db_url.hostname}")
                     db_instance = Database(
                         database_type="postgresql",
                         host=db_url.hostname,
@@ -89,27 +87,14 @@ async def startup_event():
                         password=db_url.password
                     )
                 except Exception as e:
-                    logger.warning(f"Failed to connect to PostgreSQL from DATABASE_URL: {e}, trying config...")
-            
-            # Priority 2: Config file (your PostgreSQL config)
-            if not db_instance and db_type == "postgresql":
-                try:
-                    pg_config = db_config.get("postgresql", {})
-                    logger.info(f"Using PostgreSQL from config: {pg_config.get('host', 'localhost')}:{pg_config.get('port', 5432)}")
-                    db_instance = Database(
-                        database_type="postgresql",
-                        **pg_config
-                    )
-                except Exception as e:
-                    logger.warning(f"Failed to connect to PostgreSQL from config: {e}, using SQLite instead")
+                    logger.warning(f"Failed to connect to PostgreSQL: {e}, using SQLite instead")
                     db_instance = Database(
                         database_type="sqlite",
                         sqlite_path=db_config.get("sqlite_path", "data/saveeat.db")
                     )
-            
-            # Fallback: SQLite
-            if not db_instance:
-                logger.info("Using SQLite database (fallback)")
+            else:
+                # Default: SQLite - works everywhere, no config needed!
+                logger.info("Using SQLite database (default - no PostgreSQL needed)")
                 db_instance = Database(
                     database_type="sqlite",
                     sqlite_path=db_config.get("sqlite_path", "data/saveeat.db")

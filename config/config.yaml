@@ -66,16 +66,18 @@ api:
   max_recommendations: 20
 
 # Database Configuration
+# SQLite by default - works everywhere (local, Render, etc.) without any config!
+# Just upload data/saveeat.db and it works!
 database:
-  type: "postgresql"
+  type: "sqlite"  # SQLite works perfectly on Render, no PostgreSQL needed!
+  sqlite_path: "data/saveeat.db"
+  # PostgreSQL config (optional - only used if DATABASE_URL is set)
   postgresql:
-    host: "localhost"  # Will auto-detect Render PostgreSQL if on Render
+    host: "localhost"
     port: 5432
     database: "saveeat"
     user: "saveeat_user"
     password: "saveeat_password"
-  # Fallback to SQLite if PostgreSQL not available
-  sqlite_path: "data/saveeat.db"
 
 # Context Configuration
 context:
