@@ -69,11 +69,42 @@ async def startup_event():
             
             # Initialize database
             db_config = config.get("database", {})
-            db_instance = Database(
-                database_type=db_config.get("type", "sqlite"),
-                sqlite_path=db_config.get("sqlite_path", "data/saveeat.db"),
-                **db_config.get("postgresql", {})
-            )
+            db_type = db_config.get("type", "sqlite")
+            
+            # Check for environment variables (for Render PostgreSQL)
+            import os
+            if os.getenv("DATABASE_URL"):  # Render provides this
+                # Parse DATABASE_URL: postgresql://user:password@host:port/database
+                from urllib.parse import urlparse
+                db_url = urlparse(os.getenv("DATABASE_URL"))
+                db_instance = Database(
+                    database_type="postgresql",
+                    host=db_url.hostname,
+                    port=db_url.port or 5432,
+                    database=db_url.path[1:],  # Remove leading /
+                    user=db_url.username,
+                    password=db_url.password
+                )
+            elif os.getenv("POSTGRESQL_HOST"):  # Custom PostgreSQL config
+                db_instance = Database(
+                    database_type="postgresql",
+                    host=os.getenv("POSTGRESQL_HOST"),
+                    port=int(os.getenv("POSTGRESQL_PORT", "5432")),
+                    database=os.getenv("POSTGRESQL_DATABASE", "saveeat"),
+                    user=os.getenv("POSTGRESQL_USER", "postgres"),
+                    password=os.getenv("POSTGRESQL_PASSWORD", "")
+                )
+            elif db_type == "postgresql":
+                db_instance = Database(
+                    database_type="postgresql",
+                    sqlite_path=db_config.get("sqlite_path", "data/saveeat.db"),
+                    **db_config.get("postgresql", {})
+                )
+            else:
+                db_instance = Database(
+                    database_type="sqlite",
+                    sqlite_path=db_config.get("sqlite_path", "data/saveeat.db")
+                )
             logger.info("Database initialized")
             
             # Check if database has recipes, if not, try to auto-load from CSV
