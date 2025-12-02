@@ -2,7 +2,10 @@
  * Save Eat - Frontend Application
  */
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+// Auto-detect API URL: use current host in production, localhost in development
+const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:8000/api/v1'
+    : `${window.location.protocol}//${window.location.host}/api/v1`;
 
 // DOM Elements
 const searchBtn = document.getElementById('searchBtn');
