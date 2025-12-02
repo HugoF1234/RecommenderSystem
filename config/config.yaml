@@ -66,21 +66,16 @@ api:
   max_recommendations: 20
 
 # Database Configuration
-# The app auto-detects the database type:
-# 1. DATABASE_URL environment variable (Render PostgreSQL, Heroku, etc.)
-# 2. POSTGRESQL_* environment variables
-# 3. This config file
-# 4. Default: SQLite (works everywhere)
 database:
-  type: "sqlite"  # Default: SQLite (works on Render without config)
-  sqlite_path: "data/saveeat.db"
-  # PostgreSQL config (used if type="postgresql" and no env vars)
+  type: "postgresql"
   postgresql:
-    host: "localhost"
+    host: "localhost"  # Will auto-detect Render PostgreSQL if on Render
     port: 5432
     database: "saveeat"
     user: "saveeat_user"
     password: "saveeat_password"
+  # Fallback to SQLite if PostgreSQL not available
+  sqlite_path: "data/saveeat.db"
 
 # Context Configuration
 context:

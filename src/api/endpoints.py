@@ -323,36 +323,10 @@ async def get_ingredients(limit: int = 500):
         ingredients = db_instance.get_all_ingredients(limit=limit)
         
         if not ingredients:
-            # Try to auto-load data if CSV files exist
-            from pathlib import Path
-            recipes_path = None
-            possible_paths = [
-                Path("data/raw/recipes_clean_full.csv"),
-                Path("data/raw/recipes.csv"),
-                Path("data/processed/recipes.csv"),
-            ]
-            
-            for path in possible_paths:
-                if path.exists():
-                    recipes_path = path
-                    break
-            
-            if recipes_path:
-                logger.info(f"Auto-loading data from {recipes_path}")
-                try:
-                    db_instance.load_recipes_from_csv(str(recipes_path))
-                    ingredients = db_instance.get_all_ingredients(limit=limit)
-                    if ingredients:
-                        logger.info(f"Successfully loaded {len(ingredients)} ingredients")
-                        return {"ingredients": ingredients}
-                except Exception as e:
-                    logger.error(f"Failed to auto-load data: {e}")
-            
-            # If still no ingredients, return empty list with helpful message
             logger.warning("No ingredients found in database")
             return {
                 "ingredients": [],
-                "message": "No data loaded. Please run: python main.py load-db"
+                "message": "Database is empty. Please load data using: python main.py load-db --db-type postgresql (or sqlite)"
             }
         
         return {"ingredients": ingredients}
