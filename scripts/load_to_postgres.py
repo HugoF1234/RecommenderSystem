@@ -37,7 +37,22 @@ def load_to_postgres(
         password: Database password (default: from env or empty)
     """
     
-    # Get configuration from environment or use defaults
+    # Priority 1: Parse DATABASE_URL if available (Render format)
+    database_url = os.getenv("DATABASE_URL")
+    if database_url and not host:
+        try:
+            from urllib.parse import urlparse
+            db_url = urlparse(database_url)
+            host = db_url.hostname
+            port = db_url.port or 5432
+            database = db_url.path[1:] if db_url.path else "saveeat"
+            user = db_url.username
+            password = db_url.password
+            logger.info(f"Using DATABASE_URL: {host}:{port}/{database}")
+        except Exception as e:
+            logger.warning(f"Failed to parse DATABASE_URL: {e}")
+    
+    # Priority 2: Use provided arguments or environment variables
     host = host or os.getenv("POSTGRESQL_HOST") or os.getenv("DATABASE_HOST") or "localhost"
     port = port or int(os.getenv("POSTGRESQL_PORT", os.getenv("DATABASE_PORT", "5432")))
     database = database or os.getenv("POSTGRESQL_DATABASE") or os.getenv("DATABASE_NAME") or "saveeat"

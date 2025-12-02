@@ -103,27 +103,40 @@ def main():
         if args.db_type == "postgresql":
             from scripts.load_to_postgres import load_to_postgres
             try:
-                load_to_postgres(
-                    host=args.host,
-                    port=args.port,
-                    database=args.database,
-                    user=args.user,
-                    password=args.password
-                )
-                print("Data loaded successfully into PostgreSQL!")
+                # If no arguments provided, use DATABASE_URL from environment
+                if not args.host and not args.database and not args.user:
+                    import os
+                    if os.getenv("DATABASE_URL"):
+                        print("Using DATABASE_URL from environment...")
+                        load_to_postgres()  # Will use DATABASE_URL automatically
+                    else:
+                        print("Error: No DATABASE_URL found and no connection parameters provided")
+                        print("Either set DATABASE_URL environment variable or provide --host, --database, --user, --password")
+                        sys.exit(1)
+                else:
+                    load_to_postgres(
+                        host=args.host,
+                        port=args.port,
+                        database=args.database,
+                        user=args.user,
+                        password=args.password
+                    )
+                print("✅ Data loaded successfully into PostgreSQL!")
             except Exception as e:
-                print(f"Error loading data: {e}")
+                print(f"❌ Error loading data: {e}")
                 import traceback
                 traceback.print_exc()
+                sys.exit(1)
         else:
             from src.data.load_to_db import load_data_to_database
             try:
                 load_data_to_database()
-                print("Data loaded successfully into SQLite!")
+                print("✅ Data loaded successfully into SQLite!")
             except Exception as e:
-                print(f"Error loading data: {e}")
+                print(f"❌ Error loading data: {e}")
                 import traceback
                 traceback.print_exc()
+                sys.exit(1)
     
     elif args.command == "train":
         print("Training model...")
