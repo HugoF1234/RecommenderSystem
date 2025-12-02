@@ -317,7 +317,15 @@ async def get_ingredients(limit: int = 500):
         
         recipes_path = Path("data/processed/recipes.csv")
         if not recipes_path.exists():
-            return {"ingredients": []}
+            logger.warning(f"Recipes file not found at {recipes_path.absolute()}, returning default ingredients")
+            # Return a basic list of common ingredients for demo purposes
+            default_ingredients = [
+                "tomato", "onion", "garlic", "olive oil", "salt", "pepper", "chicken",
+                "beef", "pork", "fish", "rice", "pasta", "potato", "carrot", "celery",
+                "bell pepper", "mushroom", "cheese", "milk", "butter", "flour", "egg",
+                "lemon", "lime", "herbs", "spices", "bread", "lettuce", "cucumber"
+            ]
+            return {"ingredients": default_ingredients}
         
         # Load recipes and extract ingredients - load more to get better coverage
         df = pd.read_csv(recipes_path, usecols=["ingredients_list"], nrows=None)  # Load all
@@ -343,11 +351,24 @@ async def get_ingredients(limit: int = 500):
             key=lambda x: (-ingredient_counts.get(x, 0), x)  # Negative for descending count
         )[:limit]
         
+        if not sorted_ingredients:
+            logger.warning("No ingredients found in recipes file, returning default ingredients")
+            default_ingredients = [
+                "tomato", "onion", "garlic", "olive oil", "salt", "pepper", "chicken",
+                "beef", "pork", "fish", "rice", "pasta", "potato", "carrot", "celery"
+            ]
+            return {"ingredients": default_ingredients}
+        
         return {"ingredients": sorted_ingredients}
         
     except Exception as e:
-        logger.error(f"Error getting ingredients: {e}")
-        return {"ingredients": []}
+        logger.error(f"Error getting ingredients: {e}", exc_info=True)
+        # Return default ingredients on error
+        default_ingredients = [
+            "tomato", "onion", "garlic", "olive oil", "salt", "pepper", "chicken",
+            "beef", "pork", "fish", "rice", "pasta", "potato", "carrot", "celery"
+        ]
+        return {"ingredients": default_ingredients}
 
 
 @router.post("/recommend", response_model=RecommendationResponse)
