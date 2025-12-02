@@ -137,39 +137,18 @@ async def startup_event():
                     )
             logger.info("Database initialized")
             
-            # Check if database has recipes, if not, try to auto-load from CSV
+            # Check if database has recipes
             session = db_instance.get_session()
             try:
                 from .database import Recipe
                 recipe_count = session.query(Recipe).count()
                 if recipe_count == 0:
-                    logger.info("No recipes in database. Attempting to auto-load from CSV...")
-                    # Try to auto-load if CSV files exist
-                    recipes_path = None
-                    possible_paths = [
-                        Path("data/raw/recipes_clean_full.csv"),
-                        Path("data/raw/recipes.csv"),
-                        Path("data/processed/recipes.csv"),
-                    ]
-                    
-                    for path in possible_paths:
-                        if path.exists():
-                            recipes_path = path
-                            break
-                    
-                    if recipes_path:
-                        try:
-                            logger.info(f"Found recipes CSV at {recipes_path}, loading...")
-                            db_instance.load_recipes_from_csv(str(recipes_path))
-                            recipe_count = session.query(Recipe).count()
-                            logger.info(f"Successfully loaded {recipe_count} recipes into database")
-                        except Exception as e:
-                            logger.warning(f"Failed to auto-load recipes: {e}")
-                            logger.info("Please run: python main.py load-db")
-                    else:
-                        logger.warning("No recipes CSV found. Please run: python main.py load-db")
+                    logger.warning(f"Database is empty ({recipe_count} recipes). Please load data using: python main.py load-db")
+                    logger.info("The API will work but won't return any recommendations until data is loaded.")
                 else:
-                    logger.info(f"Database has {recipe_count} recipes")
+                    logger.info(f"Database initialized with {recipe_count} recipes")
+            except Exception as e:
+                logger.error(f"Error checking database: {e}")
             finally:
                 session.close()
             
