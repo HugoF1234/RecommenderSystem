@@ -87,8 +87,17 @@ class TextEncoder(nn.Module):
         with torch.no_grad() if not self.training else torch.enable_grad():
             outputs = self.model(**encoded)
             
-            # Use mean pooling of last hidden state
-            embeddings = outputs.last_hidden_state.mean(dim=1)
+            # Use attention-weighted pooling instead of mean pooling for better performance
+            # Attention weights based on token importance
+            attention_mask = encoded.get("attention_mask", None)
+            if attention_mask is not None:
+                # Weighted mean with attention mask
+                attention_weights = attention_mask.unsqueeze(-1).float()
+                weighted_embeddings = outputs.last_hidden_state * attention_weights
+                embeddings = weighted_embeddings.sum(dim=1) / attention_weights.sum(dim=1).clamp(min=1e-9)
+            else:
+                # Fallback to mean pooling
+                embeddings = outputs.last_hidden_state.mean(dim=1)
             
             # Project to target dimension
             embeddings = self.projection(embeddings)

@@ -107,14 +107,27 @@ class Trainer:
         self.config = config
         self.device = device
         
-        # Optimizer
-        self.optimizer = optim.Adam(
+        # Optimizer with better settings for GNN training
+        self.optimizer = optim.AdamW(
             model.parameters(),
             lr=config.get("learning_rate", 0.001),
-            weight_decay=config.get("weight_decay", 0.0001)
+            weight_decay=config.get("weight_decay", 0.0001),
+            betas=(0.9, 0.999)
         )
         
-        # Loss function (BCE with logits)
+        # Learning rate scheduler for better convergence
+        if config.get("use_learning_rate_scheduler", False):
+            self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+                self.optimizer,
+                mode='min',
+                factor=config.get("scheduler_factor", 0.5),
+                patience=config.get("scheduler_patience", 3),
+                verbose=True
+            )
+        else:
+            self.scheduler = None
+        
+        # Loss function (BCE with logits) - can be extended to BPR loss for ranking
         self.criterion = nn.BCEWithLogitsLoss()
         
         # Dataset and dataloader
@@ -281,7 +294,13 @@ class Trainer:
             val_loss = val_metrics["val_loss"]
             history["val_loss"].append(val_loss)
             
+            # Update learning rate scheduler
+            if self.scheduler is not None:
+                self.scheduler.step(val_loss)
+            
             logger.info(f"Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
+            if self.scheduler is not None:
+                logger.info(f"Learning Rate: {self.optimizer.param_groups[0]['lr']:.6f}")
             
             # Early stopping
             if val_loss < self.best_val_score:

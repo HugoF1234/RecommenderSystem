@@ -44,7 +44,7 @@ Save Eat adresse le défi quotidien des étudiants et jeunes professionnels : "Q
 - **NLP** : Transformers (Hugging Face)
 - **Frontend** : HTML5, JavaScript, Tailwind CSS
 - **Database** : PostgreSQL / SQLite
-- **Data** : Food.com Dataset (Kaggle)
+- **Data** : Food.com Cleaned Dataset (Kaggle - RecSys project dataset Food.com)
 
 ### Architecture en 3 Couches
 
@@ -52,44 +52,56 @@ Save Eat adresse le défi quotidien des étudiants et jeunes professionnels : "Q
 2. **Recommendation Layer** : Modèle GNN hybride + re-ranking
 3. **Serving Layer** : API FastAPI + Frontend Tailwind CSS
 
-## 🚀 Installation
+## 🚀 Installation et Lancement Rapide
+
+**Temps estimé : 10 minutes**
 
 ### Prérequis
 
 - Python 3.10 ou supérieur
 - pip ou conda
 - Git
+- Compte Kaggle (pour télécharger le dataset)
 
-### Étapes d'Installation
+### Guide d'Installation Étape par Étape
 
-#### 1. Cloner le Repository
+#### Étape 1 : Cloner le Repository
 
 ```bash
 git clone https://github.com/HugoF1234/RecommenderSystem.git
 cd RecommenderSystem
 ```
 
-#### 2. Créer un Environnement Virtuel
+#### Étape 2 : Créer un Environnement Virtuel
 
 ```bash
-# Avec venv
+# Option A : Avec venv (recommandé)
 python -m venv venv
 source venv/bin/activate  # Sur macOS/Linux
-# ou
-venv\Scripts\activate  # Sur Windows
+# ou sur Windows :
+venv\Scripts\activate
 
-# Avec conda
+# Option B : Avec conda
 conda create -n saveeat python=3.10
 conda activate saveeat
 ```
 
-#### 3. Installer les Dépendances
+#### Étape 3 : Installer les Dépendances
 
 ```bash
 pip install -r requirements.txt
 ```
 
-#### 4. Télécharger le Dataset
+**Note :** Si vous rencontrez des erreurs avec PyTorch, installez-le séparément selon votre système :
+```bash
+# Pour CPU uniquement
+pip install torch torchvision torchaudio
+
+# Pour GPU (CUDA)
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+```
+
+#### Étape 4 : Télécharger le Dataset
 
 ##### Option A : Avec l'API Kaggle (Automatique)
 
@@ -105,11 +117,13 @@ pip install -r requirements.txt
 
 ##### Option B : Téléchargement Manuel
 
-1. Allez sur [Food.com Dataset](https://www.kaggle.com/datasets/irkaal/foodcom-recipes-and-reviews)
+1. Allez sur Kaggle et recherchez **"RecSys project dataset Food.com"**
 2. Téléchargez le dataset
-3. Extrayez les fichiers `reviews.csv` et `recipes.csv` dans `data/raw/`
+3. Extrayez les fichiers **`reviews_clean_full.csv`** et **`recipes_clean_full.csv`** dans `data/raw/`
+   
+   **Note:** Le système utilise maintenant le dataset nettoyé pour de meilleurs résultats. Si les fichiers nettoyés ne sont pas disponibles, le système essaiera automatiquement de charger les fichiers originaux (`reviews.csv` et `recipes.csv`) en fallback.
 
-#### 5. Préparer les Données
+#### Étape 5 : Préparer les Données
 
 ```bash
 python main.py preprocess
@@ -117,9 +131,23 @@ python main.py preprocess
 
 Cela va nettoyer les données, extraire les caractéristiques et créer les fichiers nécessaires dans `data/processed/`.
 
+**Temps estimé :** 2-5 minutes selon la taille du dataset.
+
+#### Étape 6 : Lancer le Système
+
+```bash
+python main.py serve
+```
+
+Le serveur démarre sur `http://localhost:8000`
+
+**C'est tout !** Vous pouvez maintenant ouvrir votre navigateur et accéder à :
+- **Interface utilisateur :** http://localhost:8000
+- **Documentation API :** http://localhost:8000/docs
+
 ## 💻 Utilisation
 
-### 1. Démarrer l'API Backend et le Frontend
+### Démarrer le Système
 
 ```bash
 python main.py serve
@@ -127,10 +155,11 @@ python main.py serve
 
 L'API sera accessible sur `http://localhost:8000`
 
-- Documentation interactive : `http://localhost:8000/docs`
-- Frontend : `http://localhost:8000/`
+- **Frontend (Interface utilisateur) :** http://localhost:8000
+- **Documentation API interactive :** http://localhost:8000/docs
+- **Health check :** http://localhost:8000/health
 
-### 2. Utiliser le Frontend
+### Utiliser le Frontend
 
 1. Ouvrez votre navigateur
 2. Accédez à `http://localhost:8000`
@@ -140,7 +169,7 @@ L'API sera accessible sur `http://localhost:8000`
 6. Cliquez sur "Chercher des Recettes"
 7. Cliquez sur "Voir la recette" pour afficher les détails complets
 
-### 3. Tester l'API directement
+### Tester l'API directement
 
 ```bash
 # Exemple de requête de recommandation
@@ -157,11 +186,75 @@ curl -X POST "http://localhost:8000/api/v1/recommend" \
 
 ### 4. Entraîner le Modèle (Optionnel)
 
-Si vous souhaitez entraîner le modèle depuis zéro :
+Si vous souhaitez entraîner le modèle GNN depuis zéro :
 
 ```bash
 python main.py train
 ```
+
+**Note importante :** Le système fonctionne sans modèle entraîné en utilisant des recommandations basées sur la popularité et les ingrédients. L'entraînement du modèle GNN est optionnel mais recommandé pour obtenir des recommandations personnalisées.
+
+**Pour entraîner le modèle manuellement** (si `python main.py train` n'est pas encore implémenté) :
+
+1. Créez un script Python ou utilisez un notebook Jupyter :
+```python
+from src.data.loader import DataLoader
+from src.data.preprocessing import DataPreprocessor
+from src.data.graph_builder import GraphBuilder
+from src.models.gnn_model import HybridGNN
+from src.training.train import Trainer
+import torch
+import yaml
+from pathlib import Path
+
+# Load config
+with open("config/config.yaml", "r") as f:
+    config = yaml.safe_load(f)
+
+# Load processed data
+loader = DataLoader()
+data = loader.load_all()
+preprocessor = DataPreprocessor()
+processed_data = preprocessor.process(data["interactions"], data["recipes"])
+
+# Build graph
+graph_builder = GraphBuilder(embedding_dim=config["graph"]["embedding_dim"])
+graph_data = graph_builder.build_hetero_graph(
+    processed_data["train"],
+    processed_data["recipes"],
+    processed_data["mappings"]
+)
+
+# Initialize model
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = HybridGNN(
+    embedding_dim=config["graph"]["embedding_dim"],
+    hidden_dim=config["model"]["gnn"]["hidden_dim"],
+    num_layers=config["model"]["gnn"]["num_layers"],
+    dropout=config["model"]["gnn"]["dropout"]
+)
+model.initialize_embeddings(
+    processed_data["stats"]["n_users"],
+    processed_data["stats"]["n_recipes"],
+    device
+)
+
+# Train
+trainer = Trainer(
+    model=model,
+    train_data=processed_data,
+    val_data=processed_data,
+    config=config["training"],
+    device=device
+)
+
+history = trainer.train(
+    graph_data=graph_data,
+    save_path=Path(config["training"]["save_path"])
+)
+```
+
+Le modèle entraîné sera sauvegardé dans `models/checkpoints/best_model.pt` et sera automatiquement chargé par l'API au prochain démarrage.
 
 ## 📁 Structure du Projet
 
@@ -169,7 +262,7 @@ python main.py train
 Project/
 ├── README.md                      # Ce fichier
 ├── requirements.txt               # Dépendances Python
-├── main.py                        # Point d'entrée principal (à développer)
+├── main.py                        # Point d'entrée principal (CLI)
 ├── config/
 │   └── config.yaml                # Configuration (hyperparamètres, chemins)
 ├── data/
@@ -269,6 +362,28 @@ Les hyperparamètres sont configurables dans `config/config.yaml` :
 - Paramètres de la base de données
 - Paramètres de l'API
 
+## ✅ Vérification Rapide
+
+Pour vérifier que tout fonctionne correctement :
+
+```bash
+# 1. Vérifier que Python est installé
+python --version  # Doit être 3.10+
+
+# 2. Vérifier que les dépendances sont installées
+pip list | grep torch
+pip list | grep fastapi
+
+# 3. Vérifier que les données sont préprocessées
+ls data/processed/train.csv data/processed/recipes.csv
+
+# 4. Tester le serveur
+python main.py serve
+# Dans un autre terminal :
+curl http://localhost:8000/health
+# Devrait retourner : {"status":"healthy"}
+```
+
 ## 🐛 Dépannage
 
 ### L'API ne démarre pas
@@ -287,22 +402,111 @@ Les hyperparamètres sont configurables dans `config/config.yaml` :
 - Vérifiez que les fichiers sont dans `data/raw/`
 - Vérifiez les noms de fichiers (peuvent varier selon la version du dataset)
 
-## 🔮 Fonctionnalités Futures
+## 🚀 Déploiement
 
-- [ ] Reconnaissance d'ingrédients par image
-- [ ] Apprentissage par renforcement pour la personnalisation continue
-- [ ] Interaction vocale
-- [ ] Intégration avec des APIs de courses
-- [ ] Mode hors-ligne pour mobile
+### Déploiement Local (Recommandé pour la démo)
 
-## 📄 Licence
+Le système fonctionne parfaitement en local. Pour permettre l'accès depuis d'autres machines sur le même réseau :
 
-Ce projet est réalisé dans le cadre du cours "RecSys Startup Sprint".
+1. Démarrez le serveur avec l'option `--host 0.0.0.0` :
+```bash
+python main.py serve --host 0.0.0.0
+```
 
-## 📞 Contact
+2. Trouvez l'adresse IP locale de votre machine :
+```bash
+# macOS/Linux
+ifconfig | grep "inet " | grep -v 127.0.0.1
 
-Pour toute question, contactez l'équipe Save Eat.
+# Windows
+ipconfig
+```
+
+3. Accédez depuis une autre machine sur le même réseau WiFi :
+```
+http://VOTRE_IP_LOCALE:8000
+```
+
+### Déploiement Cloud (Optionnel)
+
+Pour un déploiement cloud, plusieurs options sont disponibles :
+
+#### Google Cloud Run (Recommandé - Free Tier généreux)
+
+1. Créez un `Dockerfile` :
+```dockerfile
+FROM python:3.10-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+COPY . .
+CMD ["python", "main.py", "serve", "--host", "0.0.0.0", "--port", "8080"]
+```
+
+2. Déployez avec Cloud Run :
+```bash
+gcloud run deploy saveeat --source . --platform managed
+```
+
+#### Heroku (Alternative simple)
+
+1. Créez un `Procfile` :
+```
+web: python main.py serve --host 0.0.0.0 --port $PORT
+```
+
+2. Déployez :
+```bash
+heroku create saveeat
+git push heroku main
+```
+
+**Note :** Le déploiement cloud est optionnel. Un déploiement local fonctionnel est parfaitement acceptable pour ce projet.
+
+## 📊 Résumé des Commandes
+
+```bash
+# Télécharger le dataset
+python main.py download
+
+# Préprocesser les données
+python main.py preprocess
+
+# Entraîner le modèle (optionnel)
+python main.py train
+
+# Lancer le serveur
+python main.py serve
+
+# Lancer avec rechargement automatique (développement)
+python main.py serve --reload
+
+# Voir toutes les commandes
+python main.py --help
+```
+
+## ⚡ Quick Start (Résumé Ultra-Rapide)
+
+Pour les personnes pressées qui veulent lancer le projet en 10 minutes :
+
+```bash
+# 1. Installation
+git clone https://github.com/HugoF1234/RecommenderSystem.git
+cd RecommenderSystem
+python -m venv venv && source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+
+# 2. Données (si pas déjà fait)
+python main.py download && python main.py preprocess
+
+# 3. Lancer
+python main.py serve
+# Ouvrir http://localhost:8000
+```
+
+**C'est tout !** Le système est maintenant accessible.
 
 ---
 
-**Note** : Ce projet est en développement actif. N'hésitez pas à contribuer !
+**Note** : Ce projet est réalisé dans le cadre du cours "RecSys Startup Sprint" par l'équipe Save Eat.
+

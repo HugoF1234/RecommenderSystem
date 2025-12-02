@@ -84,6 +84,7 @@ class DataPreprocessor:
     def extract_ingredients(self, recipes: pd.DataFrame) -> pd.DataFrame:
         """
         Extract and parse ingredients from recipes
+        Handles both original and cleaned dataset formats
         
         Args:
             recipes: Recipe DataFrame
@@ -93,34 +94,69 @@ class DataPreprocessor:
         """
         recipes = recipes.copy()
         
-        # Parse ingredients - try different column names
-        if "RecipeIngredientParts" in recipes.columns:
-            # Food.com format: c("ingredient1", "ingredient2", ...)
-            def parse_r_list(x):
-                if pd.isna(x) or x == "":
-                    return []
-                if isinstance(x, str):
-                    # Remove c( and ) and quotes
-                    x = x.strip()
-                    if x.startswith("c("):
-                        x = x[2:]
-                    if x.endswith(")"):
-                        x = x[:-1]
-                    # Split by quotes and filter
-                    import re
-                    ingredients = re.findall(r'"([^"]+)"', x)
-                    return ingredients if ingredients else []
-                elif isinstance(x, list):
-                    return x
+        def safe_parse_ingredients(x):
+            """Safely parse ingredients from various formats"""
+            if pd.isna(x) or x == "":
                 return []
             
-            recipes["ingredients_list"] = recipes["RecipeIngredientParts"].apply(parse_r_list)
-        elif "ingredients" in recipes.columns:
-            # Standard format: string representation of list
-            recipes["ingredients_list"] = recipes["ingredients"].apply(
-                lambda x: eval(x) if isinstance(x, str) else x if isinstance(x, list) else []
+            # Already a list (cleaned dataset format)
+            if isinstance(x, list):
+                return [str(ing).strip() for ing in x if ing]
+            
+            if isinstance(x, str):
+                x = x.strip()
+                if not x:
+                    return []
+                
+                # Try JSON format first (cleaned dataset might use this)
+                try:
+                    import json
+                    parsed = json.loads(x)
+                    if isinstance(parsed, list):
+                        return [str(ing).strip() for ing in parsed if ing]
+                except (json.JSONDecodeError, ValueError):
+                    pass
+                
+                # Try Python literal eval (list as string)
+                try:
+                    import ast
+                    parsed = ast.literal_eval(x)
+                    if isinstance(parsed, list):
+                        return [str(ing).strip() for ing in parsed if ing]
+                except (ValueError, SyntaxError):
+                    pass
+                
+                # Food.com R format: c("ingredient1", "ingredient2", ...)
+                if x.startswith("c("):
+                    x = x[2:]
+                if x.endswith(")"):
+                    x = x[:-1]
+                # Extract quoted strings
+                import re
+                ingredients = re.findall(r'"([^"]+)"', x)
+                if ingredients:
+                    return [ing.strip() for ing in ingredients]
+                
+                # Last resort: split by comma (less reliable)
+                if "," in x:
+                    return [ing.strip().strip('"\'') for ing in x.split(",") if ing.strip()]
+            
+            return []
+        
+        # Parse ingredients - try different column names (prioritize cleaned dataset format)
+        if "ingredients" in recipes.columns:
+            # Cleaned dataset format: likely already a list or JSON string
+            recipes["ingredients_list"] = recipes["ingredients"].apply(safe_parse_ingredients)
+        elif "RecipeIngredientParts" in recipes.columns:
+            # Original Food.com format
+            recipes["ingredients_list"] = recipes["RecipeIngredientParts"].apply(safe_parse_ingredients)
+        elif "ingredients_list" in recipes.columns:
+            # Already processed, but ensure it's a list
+            recipes["ingredients_list"] = recipes["ingredients_list"].apply(
+                lambda x: x if isinstance(x, list) else safe_parse_ingredients(x)
             )
         else:
+            logger.warning("No ingredients column found. Creating empty ingredient lists.")
             recipes["ingredients_list"] = [[]] * len(recipes)
         
         return recipes
