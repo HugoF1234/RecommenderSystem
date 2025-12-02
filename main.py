@@ -28,8 +28,8 @@ def main():
     serve_parser.add_argument("--reload", action="store_true", help="Enable auto-reload")
     
     # Download command
-    download_parser = subparsers.add_parser("download", help="Download the dataset")
-    download_parser.add_argument("--dataset", type=str, default="irkaal/foodcom-recipes-and-reviews", help="Kaggle dataset identifier")
+    download_parser = subparsers.add_parser("download", help="Download the cleaned dataset")
+    download_parser.add_argument("--dataset", type=str, default=None, help="Kaggle dataset identifier (default: RecSys project dataset Food.com)")
     
     args = parser.parse_args()
     
@@ -72,16 +72,20 @@ def main():
         print(f"Preprocessing complete! Processed {processed_data['stats']['n_users']} users and {processed_data['stats']['n_recipes']} recipes.")
         
     elif args.command == "download":
-        print(f"Downloading dataset: {args.dataset}...")
+        print("Downloading cleaned dataset from Kaggle...")
+        print("Dataset: RecSys project dataset Food.com")
+        print("Files needed: recipes_clean_full.csv and reviews_clean_full.csv")
         from src.data.loader import DataLoader
         
         loader = DataLoader()
         try:
             loader.download_dataset(args.dataset)
             print("Dataset downloaded successfully!")
+            print("Please verify that recipes_clean_full.csv and reviews_clean_full.csv are in data/raw/")
         except Exception as e:
             print(f"Error downloading dataset: {e}")
-            print("Please download manually from: https://www.kaggle.com/datasets/irkaal/foodcom-recipes-and-reviews")
+            print("Please download manually from Kaggle: 'RecSys project dataset Food.com'")
+            print("Ensure you download recipes_clean_full.csv and reviews_clean_full.csv")
             print(f"Extract files to: {loader.raw_data_path}")
     
     elif args.command == "train":

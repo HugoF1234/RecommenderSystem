@@ -2,9 +2,11 @@
 
 # Dataset Configuration
 dataset:
-  name: "foodcom"
+  name: "foodcom_clean"  # Using cleaned dataset
   raw_data_path: "data/raw"
   processed_data_path: "data/processed"
+  # Using recipes_clean_full.csv and reviews_clean_full.csv from Kaggle
+  # Dataset: "RecSys project dataset Food.com"
   min_user_interactions: 5  # Filter users with less than 5 interactions
   min_recipe_ratings: 3      # Filter recipes with less than 3 ratings
   train_ratio: 0.7
@@ -22,9 +24,11 @@ graph:
 model:
   gnn:
     hidden_dim: 256
-    num_layers: 2
+    num_layers: 3  # Increased for deeper learning
     dropout: 0.3
-    activation: "relu"
+    activation: "gelu"  # GELU is better than ReLU for transformers/GNNs
+    use_gat: true  # Use Graph Attention Networks for better performance
+    num_heads: 4  # Multi-head attention
   
   text_encoder:
     model_name: "sentence-transformers/all-MiniLM-L6-v2"
@@ -44,6 +48,10 @@ training:
   early_stopping_patience: 5
   device: "cuda"  # or "cpu"
   save_path: "models/checkpoints"
+  n_negatives: 5  # Negative sampling ratio
+  use_learning_rate_scheduler: true  # Learning rate decay
+  scheduler_patience: 3
+  scheduler_factor: 0.5
 
 # Evaluation Configuration
 evaluation:
