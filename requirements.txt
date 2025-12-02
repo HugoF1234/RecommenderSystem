@@ -1,5 +1,7 @@
 # Core dependencies
-torch>=2.0.0
+# Note: torch is installed FIRST in build.sh using CPU-only version
+# This satisfies torch-geometric dependency without downloading CUDA packages
+torch>=2.0.0  # Will be overridden by CPU version in build.sh
 torch-geometric>=2.4.0
 transformers>=4.35.0
 numpy>=1.24.0
@@ -26,9 +28,10 @@ networkx>=3.2.0
 python-dotenv>=1.0.0
 pyyaml>=6.0.1
 tqdm>=4.66.0
-matplotlib>=3.8.0
-seaborn>=0.13.0
+# matplotlib and seaborn removed for deployment (not used in production code)
+# matplotlib>=3.8.0
+# seaborn>=0.13.0
 
-# Optional: for Kaggle dataset download
-kaggle>=1.5.16
+# Optional: for Kaggle dataset download (not needed for deployment)
+# kaggle>=1.5.16
 
