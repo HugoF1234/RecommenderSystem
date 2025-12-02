@@ -67,16 +67,19 @@ async def startup_event():
             with open(config_path, "r") as f:
                 config = yaml.safe_load(f)
             
-            # Initialize database with smart auto-detection
+            # Initialize database from config.yaml
             db_config = config.get("database", {})
+            db_type = db_config.get("type", "sqlite")
             import os
             
-            # Priority 1: DATABASE_URL (Render PostgreSQL, Heroku, etc.)
+            db_instance = None
+            
+            # Priority 1: DATABASE_URL (Render PostgreSQL - auto-detected)
             if os.getenv("DATABASE_URL"):
                 try:
                     from urllib.parse import urlparse
                     db_url = urlparse(os.getenv("DATABASE_URL"))
-                    logger.info(f"Using PostgreSQL from DATABASE_URL: {db_url.hostname}")
+                    logger.info(f"Using PostgreSQL from DATABASE_URL (Render): {db_url.hostname}")
                     db_instance = Database(
                         database_type="postgresql",
                         host=db_url.hostname,
@@ -86,55 +89,31 @@ async def startup_event():
                         password=db_url.password
                     )
                 except Exception as e:
-                    logger.warning(f"Failed to connect to PostgreSQL from DATABASE_URL: {e}, falling back to SQLite")
-                    db_instance = Database(
-                        database_type="sqlite",
-                        sqlite_path=db_config.get("sqlite_path", "data/saveeat.db")
-                    )
+                    logger.warning(f"Failed to connect to PostgreSQL from DATABASE_URL: {e}, trying config...")
             
-            # Priority 2: POSTGRESQL_* environment variables
-            elif os.getenv("POSTGRESQL_HOST"):
+            # Priority 2: Config file (your PostgreSQL config)
+            if not db_instance and db_type == "postgresql":
                 try:
-                    logger.info(f"Using PostgreSQL from environment variables: {os.getenv('POSTGRESQL_HOST')}")
+                    pg_config = db_config.get("postgresql", {})
+                    logger.info(f"Using PostgreSQL from config: {pg_config.get('host', 'localhost')}:{pg_config.get('port', 5432)}")
                     db_instance = Database(
                         database_type="postgresql",
-                        host=os.getenv("POSTGRESQL_HOST"),
-                        port=int(os.getenv("POSTGRESQL_PORT", "5432")),
-                        database=os.getenv("POSTGRESQL_DATABASE", "saveeat"),
-                        user=os.getenv("POSTGRESQL_USER", "postgres"),
-                        password=os.getenv("POSTGRESQL_PASSWORD", "")
+                        **pg_config
                     )
                 except Exception as e:
-                    logger.warning(f"Failed to connect to PostgreSQL from env vars: {e}, falling back to SQLite")
+                    logger.warning(f"Failed to connect to PostgreSQL from config: {e}, using SQLite instead")
                     db_instance = Database(
                         database_type="sqlite",
                         sqlite_path=db_config.get("sqlite_path", "data/saveeat.db")
                     )
             
-            # Priority 3: Config file
-            else:
-                db_type = db_config.get("type", "sqlite")
-                if db_type == "postgresql":
-                    try:
-                        pg_config = db_config.get("postgresql", {})
-                        logger.info(f"Using PostgreSQL from config: {pg_config.get('host', 'localhost')}")
-                        db_instance = Database(
-                            database_type="postgresql",
-                            **pg_config
-                        )
-                    except Exception as e:
-                        logger.warning(f"Failed to connect to PostgreSQL from config: {e}, falling back to SQLite")
-                        db_instance = Database(
-                            database_type="sqlite",
-                            sqlite_path=db_config.get("sqlite_path", "data/saveeat.db")
-                        )
-                else:
-                    # Default: SQLite (works everywhere, no config needed)
-                    logger.info("Using SQLite database (default)")
-                    db_instance = Database(
-                        database_type="sqlite",
-                        sqlite_path=db_config.get("sqlite_path", "data/saveeat.db")
-                    )
+            # Fallback: SQLite
+            if not db_instance:
+                logger.info("Using SQLite database (fallback)")
+                db_instance = Database(
+                    database_type="sqlite",
+                    sqlite_path=db_config.get("sqlite_path", "data/saveeat.db")
+                )
             logger.info("Database initialized")
             
             # Check if database has recipes
