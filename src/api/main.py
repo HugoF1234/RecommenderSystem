@@ -17,6 +17,9 @@ from .database import Database
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Global database instance
+db_instance = None
+
 # Create FastAPI app
 app = FastAPI(
     title="Save Eat API",
@@ -56,11 +59,34 @@ async def health():
 @app.on_event("startup")
 async def startup_event():
     """Initialize model and data on startup"""
+    global db_instance
+    
     try:
         config_path = Path(__file__).parent.parent.parent / "config" / "config.yaml"
         if config_path.exists():
             with open(config_path, "r") as f:
                 config = yaml.safe_load(f)
+            
+            # Initialize database
+            db_config = config.get("database", {})
+            db_instance = Database(
+                database_type=db_config.get("type", "sqlite"),
+                sqlite_path=db_config.get("sqlite_path", "data/saveeat.db"),
+                **db_config.get("postgresql", {})
+            )
+            logger.info("Database initialized")
+            
+            # Check if database has recipes, if not, try to load from CSV
+            session = db_instance.get_session()
+            try:
+                from .database import Recipe
+                recipe_count = session.query(Recipe).count()
+                if recipe_count == 0:
+                    logger.warning("No recipes in database. Please run: python -m src.data.load_to_db")
+                else:
+                    logger.info(f"Database has {recipe_count} recipes")
+            finally:
+                session.close()
             
             # Initialize model (placeholder - implement based on actual model loading)
             model_path = Path("models/checkpoints/best_model.pt")
@@ -75,9 +101,16 @@ async def startup_event():
                 logger.warning("Model not found - API will run but recommendations won't work")
         else:
             logger.warning("Config file not found")
+            # Initialize database with defaults
+            db_instance = Database(database_type="sqlite", sqlite_path="data/saveeat.db")
             
     except Exception as e:
-        logger.error(f"Error during startup: {e}")
+        logger.error(f"Error during startup: {e}", exc_info=True)
+        # Initialize database with defaults even on error
+        try:
+            db_instance = Database(database_type="sqlite", sqlite_path="data/saveeat.db")
+        except:
+            pass
 
 
 if __name__ == "__main__":
