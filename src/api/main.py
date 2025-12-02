@@ -76,13 +76,37 @@ async def startup_event():
             )
             logger.info("Database initialized")
             
-            # Check if database has recipes, if not, try to load from CSV
+            # Check if database has recipes, if not, try to auto-load from CSV
             session = db_instance.get_session()
             try:
                 from .database import Recipe
                 recipe_count = session.query(Recipe).count()
                 if recipe_count == 0:
-                    logger.warning("No recipes in database. Please run: python -m src.data.load_to_db")
+                    logger.info("No recipes in database. Attempting to auto-load from CSV...")
+                    # Try to auto-load if CSV files exist
+                    recipes_path = None
+                    possible_paths = [
+                        Path("data/raw/recipes_clean_full.csv"),
+                        Path("data/raw/recipes.csv"),
+                        Path("data/processed/recipes.csv"),
+                    ]
+                    
+                    for path in possible_paths:
+                        if path.exists():
+                            recipes_path = path
+                            break
+                    
+                    if recipes_path:
+                        try:
+                            logger.info(f"Found recipes CSV at {recipes_path}, loading...")
+                            db_instance.load_recipes_from_csv(str(recipes_path))
+                            recipe_count = session.query(Recipe).count()
+                            logger.info(f"Successfully loaded {recipe_count} recipes into database")
+                        except Exception as e:
+                            logger.warning(f"Failed to auto-load recipes: {e}")
+                            logger.info("Please run: python main.py load-db")
+                    else:
+                        logger.warning("No recipes CSV found. Please run: python main.py load-db")
                 else:
                     logger.info(f"Database has {recipe_count} recipes")
             finally:
