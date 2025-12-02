@@ -31,6 +31,9 @@ def main():
     download_parser = subparsers.add_parser("download", help="Download the cleaned dataset")
     download_parser.add_argument("--dataset", type=str, default=None, help="Kaggle dataset identifier (default: RecSys project dataset Food.com)")
     
+    # Load database command
+    load_db_parser = subparsers.add_parser("load-db", help="Load CSV data into database")
+    
     args = parser.parse_args()
     
     if args.command == "preprocess":
@@ -87,6 +90,17 @@ def main():
             print("Please download manually from Kaggle: 'RecSys project dataset Food.com'")
             print("Ensure you download recipes_clean_full.csv and reviews_clean_full.csv")
             print(f"Extract files to: {loader.raw_data_path}")
+    
+    elif args.command == "load-db":
+        print("Loading data into database...")
+        from src.data.load_to_db import load_data_to_database
+        try:
+            load_data_to_database()
+            print("Data loaded successfully into database!")
+        except Exception as e:
+            print(f"Error loading data: {e}")
+            import traceback
+            traceback.print_exc()
     
     elif args.command == "train":
         print("Training model...")

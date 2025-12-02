@@ -71,7 +71,7 @@ def initialize_model(model_path: str, graph_data_path: str, recipe_data_path: st
 @router.get("/recipe/{recipe_id}")
 async def get_recipe(recipe_id: int):
     """
-    Get recipe details by ID
+    Get recipe details by ID from database
     
     Args:
         recipe_id: Recipe ID
@@ -80,22 +80,19 @@ async def get_recipe(recipe_id: int):
         Recipe details
     """
     try:
-        import pandas as pd
-        import ast
-        from pathlib import Path
+        # Get database instance
+        from .main import db_instance
         
-        recipes_path = Path("data/processed/recipes.csv")
-        if not recipes_path.exists():
-            raise HTTPException(status_code=404, detail="Dataset not found")
+        if db_instance is None:
+            raise HTTPException(status_code=503, detail="Database not initialized")
         
-        # Load recipe from processed CSV first
-        recipes_df = pd.read_csv(recipes_path)
-        recipe = recipes_df[recipes_df["recipe_id"] == recipe_id]
+        # Get recipe from database
+        recipe = db_instance.get_recipe_by_id(recipe_id)
         
-        if recipe.empty:
+        if recipe is None:
             raise HTTPException(status_code=404, detail=f"Recipe {recipe_id} not found")
         
-        recipe = recipe.iloc[0]
+        return recipe
         
         # Load ingredients - try processed CSV first (faster), then raw CSV if needed
         ingredients = []
@@ -302,7 +299,7 @@ async def get_recipe(recipe_id: int):
 @router.get("/ingredients")
 async def get_ingredients(limit: int = 500):
     """
-    Get list of available ingredients
+    Get list of available ingredients from database
     
     Args:
         limit: Maximum number of ingredients to return
@@ -311,64 +308,29 @@ async def get_ingredients(limit: int = 500):
         List of ingredients
     """
     try:
-        import pandas as pd
-        import ast
-        from pathlib import Path
+        # Get database instance (will be initialized in main.py)
+        try:
+            from .main import db_instance
+        except ImportError:
+            # Fallback if main module not imported yet
+            db_instance = None
         
-        recipes_path = Path("data/processed/recipes.csv")
-        if not recipes_path.exists():
-            logger.warning(f"Recipes file not found at {recipes_path.absolute()}, returning default ingredients")
-            # Return a basic list of common ingredients for demo purposes
-            default_ingredients = [
-                "tomato", "onion", "garlic", "olive oil", "salt", "pepper", "chicken",
-                "beef", "pork", "fish", "rice", "pasta", "potato", "carrot", "celery",
-                "bell pepper", "mushroom", "cheese", "milk", "butter", "flour", "egg",
-                "lemon", "lime", "herbs", "spices", "bread", "lettuce", "cucumber"
-            ]
-            return {"ingredients": default_ingredients}
+        if db_instance is None:
+            logger.error("Database not initialized")
+            return {"ingredients": []}
         
-        # Load recipes and extract ingredients - load more to get better coverage
-        df = pd.read_csv(recipes_path, usecols=["ingredients_list"], nrows=None)  # Load all
-        all_ingredients = set()
-        ingredient_counts = {}  # Count occurrences for better sorting
+        # Get ingredients from database
+        ingredients = db_instance.get_all_ingredients(limit=limit)
         
-        for row in df["ingredients_list"]:
-            try:
-                if pd.notna(row):
-                    ingredients = ast.literal_eval(str(row)) if isinstance(row, str) else row
-                    if isinstance(ingredients, list):
-                        for ing in ingredients:
-                            ing_clean = str(ing).strip().lower()
-                            if ing_clean and len(ing_clean) > 1:  # Filter out single characters
-                                all_ingredients.add(ing_clean)
-                                ingredient_counts[ing_clean] = ingredient_counts.get(ing_clean, 0) + 1
-            except Exception as e:
-                continue
+        if not ingredients:
+            logger.warning("No ingredients found in database. Please load data using: python -m src.data.load_to_db")
+            return {"ingredients": []}
         
-        # Sort by frequency (most common first) then alphabetically
-        sorted_ingredients = sorted(
-            list(all_ingredients),
-            key=lambda x: (-ingredient_counts.get(x, 0), x)  # Negative for descending count
-        )[:limit]
-        
-        if not sorted_ingredients:
-            logger.warning("No ingredients found in recipes file, returning default ingredients")
-            default_ingredients = [
-                "tomato", "onion", "garlic", "olive oil", "salt", "pepper", "chicken",
-                "beef", "pork", "fish", "rice", "pasta", "potato", "carrot", "celery"
-            ]
-            return {"ingredients": default_ingredients}
-        
-        return {"ingredients": sorted_ingredients}
+        return {"ingredients": ingredients}
         
     except Exception as e:
         logger.error(f"Error getting ingredients: {e}", exc_info=True)
-        # Return default ingredients on error
-        default_ingredients = [
-            "tomato", "onion", "garlic", "olive oil", "salt", "pepper", "chicken",
-            "beef", "pork", "fish", "rice", "pasta", "potato", "carrot", "celery"
-        ]
-        return {"ingredients": default_ingredients}
+        return {"ingredients": []}
 
 
 @router.post("/recommend", response_model=RecommendationResponse)
