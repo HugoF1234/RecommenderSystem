@@ -299,7 +299,7 @@ async def get_recipe(recipe_id: int):
 @router.get("/ingredients")
 async def get_ingredients(limit: int = 500):
     """
-    Get list of available ingredients from database
+    Get list of available ingredients from database (cached for performance)
     
     Args:
         limit: Maximum number of ingredients to return
@@ -308,18 +308,27 @@ async def get_ingredients(limit: int = 500):
         List of ingredients
     """
     try:
-        # Get database instance (will be initialized in main.py)
+        # Get cached ingredients (pre-calculated at startup for instant response)
+        try:
+            from .main import _ingredients_cache
+        except ImportError:
+            _ingredients_cache = None
+        
+        # Use cache if available (instant!)
+        if _ingredients_cache:
+            return {"ingredients": _ingredients_cache[:limit]}
+        
+        # Fallback: query database (slower, ~10 seconds)
         try:
             from .main import db_instance
         except ImportError:
-            # Fallback if main module not imported yet
             db_instance = None
         
         if db_instance is None:
             logger.warning("Database not initialized - returning empty ingredients list")
             return {"ingredients": [], "message": "Database not initialized"}
         
-        # Get ingredients from database
+        # Get ingredients from database (fallback, slow)
         ingredients = db_instance.get_all_ingredients(limit=limit)
         
         if not ingredients:
