@@ -71,6 +71,21 @@ async def startup_event():
             db_config = config.get("database", {})
             import os
             
+            # IMPORTANT: Auto-extract database if needed (for fresh deployments)
+            db_path = Path("data/saveeat.db")
+            db_gz_path = Path("data/saveeat.db.gz")
+            if db_gz_path.exists() and not db_path.exists():
+                import gzip
+                import shutil
+                logger.info("📦 Extracting database from archive...")
+                try:
+                    with gzip.open(db_gz_path, 'rb') as f_in:
+                        with open(db_path, 'wb') as f_out:
+                            shutil.copyfileobj(f_in, f_out)
+                    logger.info("✅ Database extracted successfully!")
+                except Exception as e:
+                    logger.error(f"❌ Failed to extract database: {e}")
+            
             # Priority: Use PostgreSQL if DATABASE_URL is set (regardless of config.yaml)
             if os.getenv("DATABASE_URL"):
                 try:
