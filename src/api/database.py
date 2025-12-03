@@ -27,6 +27,8 @@ class Recipe(Base):
     description = Column(Text, nullable=True)
     ingredients_list = Column(JSON, nullable=True)  # List of ingredients as JSON
     steps = Column(Text, nullable=True)
+    steps_list = Column(JSON, nullable=True)  # List of steps as JSON
+    image_url = Column(String, nullable=True)  # Recipe image URL
     minutes = Column(Float, nullable=True)  # Preparation time in minutes
     n_steps = Column(Integer, nullable=True)
     n_ingredients = Column(Integer, nullable=True)
@@ -294,13 +296,44 @@ class Database:
                             except:
                                 tags = None
                         
+                        # Parse steps_list
+                        steps_list = None
+                        steps_text = None
+                        if "steps_list" in row and pd.notna(row["steps_list"]):
+                            try:
+                                steps_list = ast.literal_eval(str(row["steps_list"]))
+                            except:
+                                steps_list = None
+                        if "steps_text" in row and pd.notna(row["steps_text"]):
+                            steps_text = str(row["steps_text"])
+                        elif "steps" in row and pd.notna(row["steps"]):
+                            steps_text = str(row["steps"])
+                        
+                        # Get image_url
+                        image_url = None
+                        if "image_url" in row and pd.notna(row["image_url"]):
+                            image_url = str(row["image_url"])
+                        elif "Images" in row and pd.notna(row["Images"]):
+                            try:
+                                # Try to extract first URL from R-style format
+                                images_str = str(row["Images"])
+                                if 'http' in images_str:
+                                    import re
+                                    urls = re.findall(r'https?://[^\s,"]+', images_str)
+                                    if urls:
+                                        image_url = urls[0]
+                            except:
+                                pass
+                        
                         recipe = Recipe(
                             recipe_id=int(row["recipe_id"]) if pd.notna(row.get("recipe_id")) else None,
-                            name=str(row.get("name", "")) if pd.notna(row.get("name")) else "",
-                            description=str(row.get("description", "")) if pd.notna(row.get("description")) else None,
+                            name=str(row.get("name", "")) if pd.notna(row.get("name")) else str(row.get("Name", "")) if pd.notna(row.get("Name")) else "",
+                            description=str(row.get("description", "")) if pd.notna(row.get("description")) else str(row.get("Description", "")) if pd.notna(row.get("Description")) else None,
                             ingredients_list=ingredients_list,
-                            steps=str(row.get("steps", "")) if pd.notna(row.get("steps")) else None,
-                            minutes=float(row["minutes"]) if pd.notna(row.get("minutes")) else None,
+                            steps=steps_text,
+                            steps_list=steps_list,
+                            image_url=image_url,
+                            minutes=float(row["minutes"]) if pd.notna(row.get("minutes")) else float(row["prep_time"]) if pd.notna(row.get("prep_time")) else None,
                             n_steps=int(row["n_steps"]) if pd.notna(row.get("n_steps")) else None,
                             n_ingredients=int(row["n_ingredients"]) if pd.notna(row.get("n_ingredients")) else None,
                             nutrition=nutrition,
@@ -479,6 +512,8 @@ class Database:
                 "description": recipe.description,
                 "ingredients_list": recipe.ingredients_list,
                 "steps": recipe.steps,
+                "steps_list": recipe.steps_list,
+                "image_url": recipe.image_url,
                 "minutes": recipe.minutes,
                 "n_steps": recipe.n_steps,
                 "n_ingredients": recipe.n_ingredients,
