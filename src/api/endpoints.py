@@ -873,130 +873,190 @@ def apply_user_profile_filters(recipes_df, user_profile: Dict):
 
 async def _get_fallback_recommendations(request: RecommendationRequest) -> RecommendationResponse:
     """
-    Fallback recommendation method when model is not loaded
-    Returns popular recipes filtered by available ingredients
+    Fallback recommendation method when model is not loaded.
+    Utilise la base SQLite (tables Recipe & Review) au lieu des CSV.
+    - Applique d'abord éventuellement le profil utilisateur (allergies, restrictions, nutrition, etc.)
+    - Puis filtre par ingrédients et temps max
+    - Score = match ingrédients + popularité (moyenne des ratings)
     """
     try:
         import pandas as pd
         import ast
-        from pathlib import Path
-        
-        recipes_path = Path("data/processed/recipes.csv")
-        interactions_path = Path("data/processed/train.csv")
-        
-        if not recipes_path.exists():
+        import math
+        import numpy as np
+
+        from .database import Recipe, Review
+
+        # ------------------------------------------------------------------
+        # 1) Charger les recettes depuis SQLite
+        # ------------------------------------------------------------------
+        db = get_db()
+        session = db.get_session()
+
+        recipes_query = (
+            session
+            .query(
+                Recipe.recipe_id.label("recipe_id"),
+                Recipe.ingredients_list.label("ingredients_list"),
+                Recipe.minutes.label("prep_time"),      # alias minutes -> prep_time
+                Recipe.name.label("Name"),
+                Recipe.calories.label("calories"),
+                Recipe.protein.label("protein"),
+                Recipe.carbohydrates.label("carbohydrates"),
+                Recipe.total_fat.label("total_fat"),
+            )
+        )
+
+        recipes_df = pd.read_sql(recipes_query.statement, session.bind)
+
+        # ------------------------------------------------------------------
+        # 2) Charger les reviews pour calculer une popularité
+        # ------------------------------------------------------------------
+        recipe_scores = {}
+        try:
+            reviews_query = session.query(Review.recipe_id, Review.rating)
+            reviews_df = pd.read_sql(reviews_query.statement, session.bind)
+            if not reviews_df.empty:
+                recipe_scores = reviews_df.groupby("recipe_id")["rating"].mean().to_dict()
+        except Exception as e:
+            logger.warning(f"Could not load reviews for popularity scores: {e}")
+            recipe_scores = {}
+
+        session.close()
+
+        if recipes_df.empty:
             return RecommendationResponse(
                 recipe_ids=[],
                 scores=[],
-                explanations=["Dataset not found. Please run preprocessing first."]
+                explanations=["Aucune recette trouvée dans la base."]
             )
-        
-        # Load recipes
-        recipes_df = pd.read_csv(recipes_path)
 
-        # === NOUVEAU : Charger et appliquer le profil utilisateur ===
+        # ------------------------------------------------------------------
+        # 3) Profil utilisateur (si demandé) : allergies, diet, nutrition, etc.
+        # ------------------------------------------------------------------
         user_profile = None
-        if request.use_profile:  # Vérifier si l'utilisateur veut utiliser son profil
+        if getattr(request, "use_profile", True):
             try:
                 from .main import db_instance
                 if db_instance:
                     user_profile = db_instance.get_user_profile(request.user_id)
                     if user_profile:
                         logger.info(f"✅ Loaded profile for user {request.user_id}")
-                        logger.info(f"   Profile: {user_profile.get('username', 'Unknown')}")
-
-                        # Appliquer les filtres du profil AVANT tout autre traitement
                         recipes_df = apply_user_profile_filters(recipes_df, user_profile)
 
                         if len(recipes_df) == 0:
-                            logger.warning(f"⚠️ No recipes match user profile constraints!")
+                            logger.warning("No recipes match user profile constraints")
                             return RecommendationResponse(
                                 recipe_ids=[],
                                 scores=[],
-                                explanations=["Aucune recette ne correspond à vos préférences. Essayez d'assouplir certaines contraintes dans votre profil."]
+                                explanations=[
+                                    "Aucune recette ne correspond à vos préférences. "
+                                    "Essayez d'assouplir certaines contraintes dans votre profil."
+                                ],
                             )
                     else:
-                        logger.info(f"ℹ️ No profile found for user {request.user_id}")
+                        logger.info(f"No profile found for user {request.user_id}")
             except Exception as e:
-                logger.warning(f"⚠️ Could not load user profile: {e}")
-                user_profile = None
+                logger.warning(f"Could not load user profile: {e}")
         else:
-            logger.info(f"ℹ️ Profile usage disabled by request (use_profile=False)")
-        # === FIN DU NOUVEAU CODE ===
+            logger.info("Profile usage disabled by request (use_profile=False)")
 
-        # Load interactions to get popularity scores
-        recipe_scores = {}
-        if interactions_path.exists():
-            interactions_df = pd.read_csv(interactions_path, usecols=["recipe_id", "rating"], nrows=100000)
-            recipe_scores = interactions_df.groupby("recipe_id")["rating"].mean().to_dict()
-        
-        # Process available ingredients if provided
+        # ------------------------------------------------------------------
+        # 4) Filtre par ingrédients disponibles (request.available_ingredients)
+        # ------------------------------------------------------------------
         available_ings = set()
         if request.available_ingredients and len(request.available_ingredients) > 0:
-            available_ings = set(ing.lower().strip() for ing in request.available_ingredients)
-            
-            # Calculate ingredient match scores for each recipe
-            def calculate_ingredient_match(ingredients_str):
+            available_ings = {
+                ing.lower().strip()
+                for ing in request.available_ingredients
+                if isinstance(ing, str) and ing.strip()
+            }
+
+            def calculate_ingredient_match(ingredients_val):
                 """
                 Calculate how well a recipe matches available ingredients
                 Returns: (num_matched, total_recipe_ings, match_ratio, used_ingredients_count, missing_ings, matched_ings)
                 """
                 try:
-                    if pd.isna(ingredients_str):
+                    # Rien / NaN -> pas d'ingrédients
+                    if ingredients_val is None or (isinstance(ingredients_val, float) and math.isnan(ingredients_val)):
                         return (0, 0, 0.0, 0, [], [])
-                    ingredients = ast.literal_eval(str(ingredients_str)) if isinstance(ingredients_str, str) else ingredients_str
-                    if isinstance(ingredients, list) and len(ingredients) > 0:
-                        # Create normalized mappings for both recipe and available ingredients
-                        recipe_ings_normalized = {}  # normalized -> original
-                        for ing in ingredients:
-                            ing_normalized = str(ing).lower().strip()
+
+                    # Si c'est déjà une liste (JSON de la BDD)
+                    if isinstance(ingredients_val, (list, tuple, set)):
+                        ingredients = [str(x) for x in ingredients_val]
+
+                    # Si c'est un array numpy
+                    elif isinstance(ingredients_val, np.ndarray):
+                        ingredients = [str(x) for x in ingredients_val.tolist()]
+
+                    # Si c'est une string (représentation texte d'une liste)
+                    elif isinstance(ingredients_val, str):
+                        val = ingredients_val.strip()
+                        if not val:
+                            return (0, 0, 0.0, 0, [], [])
+                        try:
+                            parsed = ast.literal_eval(val)
+                            if isinstance(parsed, (list, tuple, set)):
+                                ingredients = [str(x) for x in parsed]
+                            else:
+                                ingredients = [s.strip() for s in val.split(",") if s.strip()]
+                        except Exception:
+                            ingredients = [s.strip() for s in val.split(",") if s.strip()]
+
+                    else:
+                        # Type inconnu -> on abandonne poliment
+                        return (0, 0, 0.0, 0, [], [])
+
+                    if len(ingredients) == 0:
+                        return (0, 0, 0.0, 0, [], [])
+
+                    # Normalisation des ingrédients de la recette
+                    recipe_ings_normalized = {}
+                    for ing in ingredients:
+                        ing_normalized = str(ing).lower().strip()
+                        if ing_normalized:
                             recipe_ings_normalized[ing_normalized] = str(ing)
-                        
-                        recipe_ings_set = set(recipe_ings_normalized.keys())
-                        matched_normalized = available_ings & recipe_ings_set
-                        missing_normalized = recipe_ings_set - available_ings  # Ingrédients nécessaires mais non disponibles
-                        
-                        num_matched = len(matched_normalized)
-                        total_recipe = len(recipe_ings_set)
-                        match_ratio = num_matched / total_recipe if total_recipe > 0 else 0.0
-                        
-                        # Convert to lists of original ingredient names
-                        matched_list = [recipe_ings_normalized[ing] for ing in matched_normalized]
-                        missing_list = [recipe_ings_normalized[ing] for ing in missing_normalized]
-                        
-                        return (num_matched, total_recipe, match_ratio, num_matched, missing_list, matched_list)
-                    return (0, 0, 0.0, 0, [], [])
+
+                    recipe_ings_set = set(recipe_ings_normalized.keys())
+                    matched_normalized = available_ings & recipe_ings_set
+                    missing_normalized = recipe_ings_set - available_ings
+
+                    num_matched = len(matched_normalized)
+                    total_recipe = len(recipe_ings_set)
+                    match_ratio = num_matched / total_recipe if total_recipe > 0 else 0.0
+
+                    matched_list = [recipe_ings_normalized[ing] for ing in matched_normalized]
+                    missing_list = [recipe_ings_normalized[ing] for ing in missing_normalized]
+
+                    return (num_matched, total_recipe, match_ratio, num_matched, missing_list, matched_list)
+
                 except Exception as e:
                     logger.warning(f"Error calculating ingredient match: {e}")
                     return (0, 0, 0.0, 0, [], [])
-            
-            # Calculate match metrics for all recipes
+
             match_data = recipes_df["ingredients_list"].apply(calculate_ingredient_match)
             recipes_df["ingredients_matched"] = match_data.apply(lambda x: x[0])
             recipes_df["recipe_total_ingredients"] = match_data.apply(lambda x: x[1])
             recipes_df["ingredient_match_ratio"] = match_data.apply(lambda x: x[2])
             recipes_df["ingredients_used_count"] = match_data.apply(lambda x: x[3])
-            recipes_df["missing_ingredients"] = match_data.apply(lambda x: x[4])  # List of missing ingredients
-            recipes_df["matched_ingredients"] = match_data.apply(lambda x: x[5])  # List of matched ingredients
-            
-            # Check if recipe has ALL ingredients (100% match) - STRICT check
-            # Must have: matched == total AND total > 0 AND no missing ingredients
+            recipes_df["missing_ingredients"] = match_data.apply(lambda x: x[4])
+            recipes_df["matched_ingredients"] = match_data.apply(lambda x: x[5])
+
             recipes_df["has_all_ingredients"] = (
                 (recipes_df["ingredients_matched"] == recipes_df["recipe_total_ingredients"]) &
                 (recipes_df["recipe_total_ingredients"] > 0) &
                 (recipes_df["ingredients_matched"] > 0) &
                 (recipes_df["missing_ingredients"].apply(lambda x: len(x) if isinstance(x, list) else 0) == 0)
             )
-            
-            # Filter: recipe must use at least 1 ingredient from available list
-            # LOWER the threshold to 20% to allow more recipes (don't require high match)
-            # The scoring system will prioritize recipes with more ingredients in common
+
+            # On garde seulement les recettes qui utilisent au moins 1 ingrédient
+            # et avec un match ratio >= 0.2
             recipes_df = recipes_df[
-                (recipes_df["ingredients_matched"] > 0) & 
-                (recipes_df["ingredient_match_ratio"] >= 0.2)  # Lowered from 0.3 to allow more variety
+                (recipes_df["ingredients_matched"] > 0) &
+                (recipes_df["ingredient_match_ratio"] >= 0.2)
             ]
         else:
-            # No ingredient filtering - all recipes eligible
             recipes_df["ingredients_matched"] = 0
             recipes_df["recipe_total_ingredients"] = 0
             recipes_df["ingredient_match_ratio"] = 0.0
@@ -1004,128 +1064,139 @@ async def _get_fallback_recommendations(request: RecommendationRequest) -> Recom
             recipes_df["missing_ingredients"] = recipes_df.apply(lambda x: [], axis=1)
             recipes_df["matched_ingredients"] = recipes_df.apply(lambda x: [], axis=1)
             recipes_df["has_all_ingredients"] = False
-        
-        # Filter by max_time if provided
+
+        # ------------------------------------------------------------------
+        # 5) Filtre max_time de la requête (en plus du max_prep_time du profil)
+        # ------------------------------------------------------------------
         if request.max_time and "prep_time" in recipes_df.columns:
             recipes_df = recipes_df[recipes_df["prep_time"] <= request.max_time]
-        
-        # Sort by ingredient usage first (recipes using most ingredients from selection)
-        # Then by popularity/rating
+
+        # ------------------------------------------------------------------
+        # 6) Score : popularité + match ingrédients
+        # ------------------------------------------------------------------
         if len(recipes_df) > 0:
-            # Normalize popularity score
-            recipes_df["raw_score"] = recipes_df["recipe_id"].map(lambda x: recipe_scores.get(x, 0))
-            max_popularity = recipes_df["raw_score"].max() if recipes_df["raw_score"].max() > 0 else 5.0
+            recipes_df["raw_score"] = recipes_df["recipe_id"].map(lambda x: recipe_scores.get(x, 0.0))
+            recipes_df["raw_score"] = recipes_df["raw_score"].fillna(0.0)
+
+            max_popularity = recipes_df["raw_score"].max()
+            if not pd.notna(max_popularity) or max_popularity <= 0:
+                max_popularity = 5.0
+
             recipes_df["popularity_score"] = recipes_df["raw_score"] / max_popularity
-            
-            # Calculate final score: prioritize recipes with most ingredients in common
-            # Score should reflect REAL match quality, prioritizing recipes using MOST of your ingredients
+            recipes_df["popularity_score"] = recipes_df["popularity_score"].fillna(0.0)
+
             if request.available_ingredients and len(request.available_ingredients) > 0:
                 total_available = len(request.available_ingredients)
-                
-                # Score is based on: how many of YOUR ingredients are used (primary)
-                # and what percentage of the RECIPE ingredients you have (secondary)
-                
-                # Primary: Number of ingredients used (normalize to 0-1 relative to YOUR ingredients)
-                # A recipe using 5/7 of your ingredients gets higher score than one using 1/7
-                recipes_df["ingredient_usage_ratio"] = recipes_df["ingredients_used_count"] / total_available if total_available > 0 else 0
-                
-                # Secondary: Match ratio (percentage of recipe ingredients you have)
+
+                recipes_df["ingredient_usage_ratio"] = (
+                    recipes_df["ingredients_used_count"] / total_available
+                    if total_available > 0 else 0
+                )
+
                 recipes_df["match_ratio_score"] = recipes_df["ingredient_match_ratio"]
-                
-                # Small bonus if recipe has ALL ingredients (allows reaching higher scores)
                 recipes_df["completeness_bonus"] = recipes_df["has_all_ingredients"].astype(float) * 0.20
-                
-                # Combined score:
-                # - 65% weight on ingredient usage (recipes using MORE of your ingredients rank higher)
-                # - 25% weight on match ratio (recipes where you have high % of needed ingredients)
-                # - 10% weight on popularity
-                # - 20% bonus if you have ALL ingredients (max possible score = 1.20, capped to 1.0)
+
                 recipes_df["score"] = (
                     0.65 * recipes_df["ingredient_usage_ratio"] +
                     0.25 * recipes_df["match_ratio_score"] +
                     0.10 * recipes_df["popularity_score"] +
                     recipes_df["completeness_bonus"]
                 )
-                
-                # Cap at 1.0 for display
+
                 recipes_df["score"] = recipes_df["score"].clip(0, 1.0)
+                recipes_df["score"] = recipes_df["score"].fillna(0.0)
             else:
-                # No ingredients selected - sort by popularity only
-                recipes_df["score"] = recipes_df["popularity_score"]
+                recipes_df["score"] = recipes_df["popularity_score"].fillna(0.0)
         else:
             recipes_df["score"] = 0.0
-        
-        # Sort by score (descending) - recipes using most ingredients first
+
+        # ------------------------------------------------------------------
+        # 7) Tri + top_k + nettoyage des scores
+        # ------------------------------------------------------------------
         recipes_df = recipes_df.sort_values("score", ascending=False, na_position="last")
-        
-        # Get top-k
+
         top_k = min(request.top_k, len(recipes_df))
         top_recipes = recipes_df.head(top_k)
-        
+
         recipe_ids = top_recipes["recipe_id"].tolist()
         scores = top_recipes["score"].tolist()
-        
-        # Generate explanations with ingredient match info
+
+        clean_scores = []
+        for s in scores:
+            try:
+                f = float(s)
+                if math.isnan(f) or math.isinf(f):
+                    f = 0.0
+            except Exception:
+                f = 0.0
+            clean_scores.append(f)
+        scores = clean_scores
+
+        # ------------------------------------------------------------------
+        # 8) Explications
+        # ------------------------------------------------------------------
         explanations = []
         for _, row in top_recipes.iterrows():
             name = row.get("Name", row.get("name", f"Recipe {row['recipe_id']}"))
-            
-            # Add ingredient match information if available
+
             if "ingredients_used_count" in row and row["ingredients_used_count"] > 0:
                 used = int(row["ingredients_used_count"])
                 recipe_total = int(row["recipe_total_ingredients"]) if "recipe_total_ingredients" in row else 0
                 match_pct = int(row["ingredient_match_ratio"] * 100) if "ingredient_match_ratio" in row else 0
-                
-                # Get missing ingredients list
+
                 missing_ings = row.get("missing_ingredients", [])
                 if not isinstance(missing_ings, list):
                     missing_ings = []
                 missing_count = len(missing_ings)
-                
-                # Double-check: if missing_count doesn't match, recalculate
+
                 if missing_count != (recipe_total - used):
                     missing_count = recipe_total - used
-                
-                # STRICT check: recipe has ALL ingredients only if:
-                # 1. has_all_ingredients flag is True
-                # 2. missing_count is 0
-                # 3. used == recipe_total
+
                 has_all = (
-                    row.get("has_all_ingredients", False) and 
-                    missing_count == 0 and 
-                    used == recipe_total and 
+                    row.get("has_all_ingredients", False) and
+                    missing_count == 0 and
+                    used == recipe_total and
                     recipe_total > 0
                 )
-                
+
                 if has_all:
-                    explanations.append(f"✅ Vous avez TOUS les ingrédients nécessaires ({used}/{recipe_total}): {name}")
+                    explanations.append(
+                        f"✅ Vous avez TOUS les ingrédients nécessaires ({used}/{recipe_total}) : {name}"
+                    )
                 elif missing_count > 0:
-                    # Show missing ingredients information
                     if len(missing_ings) > 0:
-                        # Show first 2-3 missing ingredients
                         missing_display = ", ".join(missing_ings[:3])
                         if len(missing_ings) > 3:
                             missing_display += f" (+{len(missing_ings) - 3} autres)"
-                        explanations.append(f"⚠️ Il manque {missing_count} ingrédient(s) ({used}/{recipe_total} disponibles): {name}. Manquent: {missing_display}")
+                        explanations.append(
+                            f"⚠️ Il manque {missing_count} ingrédient(s) "
+                            f"({used}/{recipe_total} disponibles) : {name}. "
+                            f"Manquent : {missing_display}"
+                        )
                     else:
-                        explanations.append(f"⚠️ Il manque {missing_count} ingrédient(s) ({used}/{recipe_total} disponibles, {match_pct}%): {name}")
+                        explanations.append(
+                            f"⚠️ Il manque {missing_count} ingrédient(s) "
+                            f"({used}/{recipe_total} disponibles, {match_pct}%) : {name}"
+                        )
                 else:
-                    explanations.append(f"Utilise {used}/{recipe_total} ingrédients ({match_pct}% de la recette): {name}")
+                    explanations.append(
+                        f"Utilise {used}/{recipe_total} ingrédients ({match_pct}% de la recette) : {name}"
+                    )
             else:
-                explanations.append(f"Recette populaire: {name}")
-        
+                explanations.append(f"Recette populaire : {name}")
+
         return RecommendationResponse(
             recipe_ids=recipe_ids,
             scores=scores,
-            explanations=explanations
+            explanations=explanations,
         )
-        
+
     except Exception as e:
-        logger.error(f"Error in fallback recommendations: {e}")
+        logger.error(f"Error in fallback recommendations (DB): {e}", exc_info=True)
         return RecommendationResponse(
             recipe_ids=[],
             scores=[],
-            explanations=[f"Error: {str(e)}"]
+            explanations=[f"Error: {str(e)}"],
         )
 
 
@@ -1241,11 +1312,22 @@ async def get_recipe_reviews(recipe_id: int, limit: int = 5):
 
 # Database dependency will be created per request
 def get_db():
-    """Database dependency"""
-    # Will be initialized from config in main.py
-    # For now, create a simple instance
-    db = Database(database_type="sqlite", sqlite_path="data/saveeat.db")
-    return db
+    """Database dependency
+        
+    On réutilise l'instance globale créée dans main.py si elle existe,
+    sinon on crée une instance SQLite par défaut.
+    """
+    try:
+        from .main import db_instance
+    except ImportError:
+        db_instance = None
+
+    if db_instance is None:
+        # Fallback: API lancée "à cru" sans main.py
+        return Database(database_type="sqlite", sqlite_path="data/saveeat.db")
+    
+    return db_instance
+
 
 
 # ============================================================================
