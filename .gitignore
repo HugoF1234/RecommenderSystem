@@ -12,21 +12,30 @@ ENV/
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# Data
-data/raw/*
-data/processed/*
-!data/raw/.gitkeep
-!data/processed/.gitkeep
+# Data - CSV files included via Git LFS
+data/raw/*.parquet
+!data/raw/recipes.csv
+!data/raw/reviews.csv
+!data/processed/recipes.csv
+!data/processed/train.csv
+!data/processed/val.csv
+!data/processed/test.csv
+!data/processed/mappings.pkl
+!data/processed/stats.json
 
 # Models
 models/checkpoints/*
 *.pt
 *.pth
 
-# Database
+# Database (uncompressed - generated from .gz)
 *.db
+*.db.backup
+*.db.old
 *.sqlite
 *.sqlite3
+# Include compressed database for easy deployment
+!data/saveeat.db.gz
 
 # IDE
 .vscode/
