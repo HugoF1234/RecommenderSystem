@@ -1,6 +1,8 @@
 """
-Application entry point for Render deployment
-This file is used by gunicorn: gunicorn app:app
+Application entry point for Save Eat
+Can be used for:
+- Direct execution: python app.py
+- Render deployment: gunicorn app:app
 """
 
 import sys
@@ -15,4 +17,13 @@ from src.api.main import app
 
 # Export app for gunicorn
 __all__ = ["app"]
+
+# Run server when executed directly
+if __name__ == "__main__":
+    import uvicorn
+    print("🚀 Starting Save Eat API...")
+    print("📍 Server will be available at: http://localhost:8000")
+    print("📚 API Documentation: http://localhost:8000/docs")
+    print("⚡ Press CTRL+C to stop")
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 
