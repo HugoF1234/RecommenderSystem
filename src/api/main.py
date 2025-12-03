@@ -10,6 +10,7 @@ from pathlib import Path
 import uvicorn
 import yaml
 import logging
+import threading
 
 from .endpoints import router, initialize_model
 from .database import Database
@@ -20,6 +21,21 @@ logger = logging.getLogger(__name__)
 # Global database instance and cache
 db_instance = None
 _ingredients_cache = None
+
+
+def _precalculate_ingredients_cache():
+    """
+    Pre-calculate ingredients cache in background thread (after port binding)
+    This prevents Render timeout during startup
+    """
+    global _ingredients_cache
+    try:
+        logger.info("🔄 Pre-calculating ingredients cache in background...")
+        _ingredients_cache = db_instance.get_all_ingredients(500)
+        logger.info(f"✅ Cached {len(_ingredients_cache)} ingredients")
+    except Exception as e:
+        logger.error(f"Failed to pre-calculate ingredients cache: {e}")
+        _ingredients_cache = []
 
 # Create FastAPI app
 app = FastAPI(
@@ -127,11 +143,11 @@ async def startup_event():
                 else:
                     logger.info(f"Database initialized with {recipe_count} recipes")
                     
-                    # Pre-calculate ingredients cache (speeds up /ingredients endpoint from 10s to instant!)
-                    global _ingredients_cache
-                    logger.info("Pre-calculating ingredients cache...")
-                    _ingredients_cache = db_instance.get_all_ingredients(limit=500)
-                    logger.info(f"✅ Cached {len(_ingredients_cache)} ingredients")
+                    # Schedule ingredients cache pre-calculation in background thread (after port binding!)
+                    # This prevents Render timeout during startup - server binds port first, then cache loads
+                    cache_thread = threading.Thread(target=_precalculate_ingredients_cache, daemon=True)
+                    cache_thread.start()
+                    logger.info("🚀 Started background cache pre-calculation (server will bind port immediately)")
                     
             except Exception as e:
                 logger.error(f"Error checking database: {e}")
