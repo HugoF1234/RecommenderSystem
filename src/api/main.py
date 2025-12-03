@@ -17,8 +17,9 @@ from .database import Database
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Global database instance
+# Global database instance and cache
 db_instance = None
+_ingredients_cache = None
 
 # Create FastAPI app
 app = FastAPI(
@@ -125,6 +126,13 @@ async def startup_event():
                     logger.info("The API will work but won't return any recommendations until data is loaded.")
                 else:
                     logger.info(f"Database initialized with {recipe_count} recipes")
+                    
+                    # Pre-calculate ingredients cache (speeds up /ingredients endpoint from 10s to instant!)
+                    global _ingredients_cache
+                    logger.info("Pre-calculating ingredients cache...")
+                    _ingredients_cache = db_instance.get_all_ingredients(limit=500)
+                    logger.info(f"✅ Cached {len(_ingredients_cache)} ingredients")
+                    
             except Exception as e:
                 logger.error(f"Error checking database: {e}")
             finally:
