@@ -15,15 +15,33 @@ class SaveEatApp {
         this.setupEventListeners();
     }
 
-    async loadIngredients() {
+    async loadIngredients(retryCount = 0) {
         try {
             const response = await fetch('/api/v1/ingredients?limit=500');
+            
+            // Check if response is OK
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
             const data = await response.json();
             
             if (data.ingredients && data.ingredients.length > 0) {
                 this.ingredients = data.ingredients;
                 this.renderIngredients();
                 console.log(`✅ Loaded ${this.ingredients.length} ingredients`);
+            } else if (data.status === 'loading' && retryCount < 10) {
+                // Cache still loading - show message and retry
+                console.log(`⏳ Ingredients loading... (retry ${retryCount + 1}/10)`);
+                document.getElementById('ingredientsContainer').innerHTML = `
+                    <div class="text-center w-full py-8">
+                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mb-4"></div>
+                        <p class="font-medium text-gray-700">Chargement des ingrédients...</p>
+                        <p class="text-sm text-gray-500 mt-2">${data.message || 'Première initialisation en cours'}</p>
+                    </div>
+                `;
+                // Retry after 2 seconds
+                setTimeout(() => this.loadIngredients(retryCount + 1), 2000);
             } else {
                 console.warn('No ingredients found');
                 document.getElementById('ingredientsContainer').innerHTML = `
@@ -39,6 +57,9 @@ class SaveEatApp {
                 <div class="text-center w-full py-4 text-red-500">
                     <p class="font-medium">Erreur de chargement</p>
                     <p class="text-sm">${error.message}</p>
+                    <button onclick="location.reload()" class="mt-4 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">
+                        Recharger la page
+                    </button>
                 </div>
             `;
         }

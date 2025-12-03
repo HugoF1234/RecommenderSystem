@@ -315,30 +315,17 @@ async def get_ingredients(limit: int = 500):
             _ingredients_cache = None
         
         # Use cache if available (instant!)
-        if _ingredients_cache:
+        if _ingredients_cache is not None:
             return {"ingredients": _ingredients_cache[:limit]}
         
-        # Fallback: query database (slower, ~10 seconds)
-        try:
-            from .main import db_instance
-        except ImportError:
-            db_instance = None
-        
-        if db_instance is None:
-            logger.warning("Database not initialized - returning empty ingredients list")
-            return {"ingredients": [], "message": "Database not initialized"}
-        
-        # Get ingredients from database (fallback, slow)
-        ingredients = db_instance.get_all_ingredients(limit=limit)
-        
-        if not ingredients:
-            logger.warning("No ingredients found in database")
-            return {
-                "ingredients": [],
-                "message": "Database is empty. Please load data using: python main.py load-db --db-type postgresql (or sqlite)"
-            }
-        
-        return {"ingredients": ingredients}
+        # Cache not ready yet (still loading in background)
+        # Return empty list with helpful message instead of slow database query
+        logger.info("Ingredients cache not ready yet (loading in background)")
+        return {
+            "ingredients": [], 
+            "message": "Ingredients are loading... Please refresh in a few seconds.",
+            "status": "loading"
+        }
         
     except Exception as e:
         logger.error(f"Error getting ingredients: {e}", exc_info=True)
