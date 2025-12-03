@@ -1,8 +1,8 @@
 # Core dependencies
 # Note: torch is installed FIRST in build.sh using CPU-only version
 # Versions pinned for stable deployment (Dec 2024)
-torch==2.5.1  # Stable version with CPU support
-torch-geometric==2.6.1
+torch==2.2.2  # Stable version with CPU support
+torch-geometric==2.3.1
 transformers==4.46.3
 numpy==1.26.4
 pandas==2.2.3

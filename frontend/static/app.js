@@ -6,6 +6,7 @@ class SaveEatApp {
         this.selectedIngredients = new Set();
         this.selectedDietaryPrefs = new Set();
         this.ingredients = [];
+        this.filteredIngredients = [];
         this.init();
     }
 
@@ -28,7 +29,9 @@ class SaveEatApp {
             
             if (data.ingredients && data.ingredients.length > 0) {
                 this.ingredients = data.ingredients;
+                this.filteredIngredients = [...this.ingredients];
                 this.renderIngredients();
+                this.renderSelectedIngredients();
                 console.log(`✅ Loaded ${this.ingredients.length} ingredients`);
             } else if (data.status === 'loading' && retryCount < 10) {
                 // Cache still loading - show message and retry
@@ -67,13 +70,34 @@ class SaveEatApp {
 
     renderIngredients() {
         const container = document.getElementById('ingredientsContainer');
-        container.innerHTML = this.ingredients.map(ing => `
-            <button 
-                data-ingredient="${ing}"
-                class="ingredient-chip px-4 py-2 rounded-full bg-white border-2 border-gray-300 text-gray-700 hover:border-green-500 hover:bg-green-50 text-sm font-medium transition-all">
-                ${this.capitalize(ing)}
-            </button>
-        `).join('');
+        const list = this.filteredIngredients && this.filteredIngredients.length > 0
+            ? this.filteredIngredients
+            : this.ingredients;
+
+        if (!list || list.length === 0) {
+            container.innerHTML = `
+                <div class="w-full text-center text-sm text-gray-500 py-2">
+                    Aucun ingrédient ne correspond à votre recherche
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = list.map(ing => {
+            const isSelected = this.selectedIngredients.has(ing);
+            const baseClasses = 'ingredient-chip px-4 py-2 rounded-full text-sm font-medium transition-all';
+            const unselectedClasses = 'bg-white border-2 border-gray-300 text-gray-700 hover:border-green-500 hover:bg-green-50';
+            const selectedClasses = 'bg-green-500 border-green-500 text-white hover:bg-green-600';
+            const classes = `${baseClasses} ${isSelected ? selectedClasses : unselectedClasses}`;
+
+            return `
+                <button 
+                    data-ingredient="${ing}"
+                    class="${classes}">
+                    ${this.capitalize(ing)}
+                </button>
+            `;
+        }).join('');
 
         // Add click listeners
         container.querySelectorAll('.ingredient-chip').forEach(btn => {
@@ -95,9 +119,59 @@ class SaveEatApp {
         }
 
         console.log(`Selected ingredients: ${Array.from(this.selectedIngredients).join(', ')}`);
+        this.renderSelectedIngredients();
+    }
+
+    renderSelectedIngredients() {
+        const container = document.getElementById('selectedIngredientsContainer');
+        if (!container) return;
+
+        const selected = Array.from(this.selectedIngredients);
+
+        if (selected.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        container.innerHTML = selected.map(ing => `
+            <button 
+                data-ingredient="${ing}"
+                class="flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 text-xs font-medium border border-emerald-300 hover:bg-emerald-200 transition-all">
+                <span>${this.capitalize(ing)}</span>
+                <span class="text-emerald-700 text-xs font-bold">×</span>
+            </button>
+        `).join('');
+
+        // Clicking on a selected chip removes it and updates both lists
+        container.querySelectorAll('button[data-ingredient]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const ing = btn.dataset.ingredient;
+                if (this.selectedIngredients.has(ing)) {
+                    this.selectedIngredients.delete(ing);
+                    this.renderIngredients();
+                    this.renderSelectedIngredients();
+                }
+            });
+        });
     }
 
     setupEventListeners() {
+        // Ingredient search
+        const ingredientSearch = document.getElementById('ingredientSearch');
+        if (ingredientSearch) {
+            ingredientSearch.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                if (!query) {
+                    this.filteredIngredients = [...this.ingredients];
+                } else {
+                    this.filteredIngredients = this.ingredients.filter(ing =>
+                        ing.toLowerCase().includes(query)
+                    );
+                }
+                this.renderIngredients();
+            });
+        }
+
         // Dietary preferences
         document.querySelectorAll('.dietary-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
