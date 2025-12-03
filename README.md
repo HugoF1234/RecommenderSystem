@@ -1,512 +1,264 @@
-# 🍳 Save Eat - Recommandation de Recettes Intelligentes
+# 🍳 Save Eat - Smart Recipe Recommendation System
 
-Save Eat est un système de recommandation de recettes basé sur des Graph Neural Networks (GNN) qui transforme les ingrédients disponibles en suggestions personnalisées et intelligentes.
+## 📖 Project Description
 
-## 📋 Table des Matières
+Save Eat is an intelligent recipe recommendation system that helps users discover recipes based on available ingredients, time constraints, and dietary preferences. The system uses Graph Neural Networks (GNN) combined with text embeddings to provide personalized recommendations.
 
-- [Description du Projet](#description-du-projet)
-- [Équipe](#équipe)
-- [Architecture Technique](#architecture-technique)
-- [Installation](#installation)
-- [Utilisation](#utilisation)
-- [Structure du Projet](#structure-du-projet)
-- [Documentation Technique](#documentation-technique)
+**Key Features:**
+- Context-aware recommendations (ingredients, time, dietary preferences)
+- Hybrid architecture combining GNN with text embeddings
+- Interactive web interface
+- 522,517 recipes and 1,401,982 user reviews
 
-## 📖 Description du Projet
+## 👥 Team Members
 
-Save Eat adresse le défi quotidien des étudiants et jeunes professionnels : "Qu'est-ce que je peux cuisiner avec ce que j'ai ?". Le système combine :
+- **Victor Lestrade** - Project Lead (PL)
+- **Matthieu Houette** - Data Engineer (DE)  
+- **Hugo Fouan** - Lead ML Engineer (MLE-Core)
+- **Basile Sorrel** - ML Engineer - Ops (MLE-Ops)
+- **Wadih Ben Abdesselem** - Systems Engineer (SE)
 
-- **Recommandation personnalisée** basée sur l'historique utilisateur
-- **Awareness contextuelle** (ingrédients disponibles, temps disponible, préférences alimentaires)
-- **Architecture hybride GNN** fusionnant graphes de relations recette-ingrédient avec embeddings textuels
-- **Re-ranking contextuel** pour optimiser les suggestions en temps réel
+## 🚀 Quick Start (10 minutes)
 
-### Innovation Technique
-
-1. **Graph Neural Networks** : Modélisation des relations utilisateurs-recettes-ingrédients via PyTorch Geometric
-2. **Embeddings textuels** : Fusion des caractéristiques textuelles (titres, descriptions) avec Transformers
-3. **Re-ranking contextuel** : Réorganisation intelligente basée sur les contraintes réelles (ingrédients, temps, préférences)
-
-## 👥 Équipe
-
-- **Project Lead (PL)** : Victor Lestrade
-- **Data Engineer (DE)** : Matthieu Houette
-- **Lead ML Engineer (MLE-Core)** : Hugo Fouan
-- **ML Engineer - Ops (MLE-Ops)** : Basile Sorrel
-- **Systems Engineer (SE)** : Wadih Ben Abdesselem
-
-## 🏗️ Architecture Technique
-
-### Stack Technologique
-
-- **Backend** : Python 3.10+, FastAPI
-- **ML Framework** : PyTorch, PyTorch Geometric
-- **NLP** : Transformers (Hugging Face)
-- **Frontend** : HTML5, JavaScript, Tailwind CSS
-- **Database** : PostgreSQL / SQLite
-- **Data** : Food.com Cleaned Dataset (Kaggle - RecSys project dataset Food.com)
-
-### Architecture en 3 Couches
-
-1. **Data Layer** : Ingestion, nettoyage, construction de graphes
-2. **Recommendation Layer** : Modèle GNN hybride + re-ranking
-3. **Serving Layer** : API FastAPI + Frontend Tailwind CSS
-
-## 🚀 Installation et Lancement Rapide
-
-**Temps estimé : 10 minutes**
-
-### Prérequis
-
-- Python 3.10 ou supérieur
-- pip ou conda
-- Git
-- Compte Kaggle (pour télécharger le dataset)
-
-### Guide d'Installation Étape par Étape
-
-#### Étape 1 : Cloner le Repository
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/HugoF1234/RecommenderSystem.git
 cd RecommenderSystem
 ```
 
-#### Étape 2 : Créer un Environnement Virtuel
+### 2. Create a virtual environment
 
 ```bash
-# Option A : Avec venv (recommandé)
+# macOS/Linux
 python -m venv venv
-source venv/bin/activate  # Sur macOS/Linux
-# ou sur Windows :
-venv\Scripts\activate
+source venv/bin/activate
 
-# Option B : Avec conda
-conda create -n saveeat python=3.10
-conda activate saveeat
+# Windows
+python -m venv venv
+venv\Scripts\activate
 ```
 
-#### Étape 3 : Installer les Dépendances
+### 3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-**Note :** Si vous rencontrez des erreurs avec PyTorch, installez-le séparément selon votre système :
-```bash
-# Pour CPU uniquement
-pip install torch torchvision torchaudio
-
-# Pour GPU (CUDA)
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-```
-
-#### Étape 4 : Télécharger le Dataset
-
-##### Option A : Avec l'API Kaggle (Automatique)
-
-1. Configurez vos credentials Kaggle :
-   - Créez un compte sur [Kaggle](https://www.kaggle.com/)
-   - Téléchargez votre `kaggle.json` depuis Account > API
-   - Placez-le dans `~/.kaggle/kaggle.json` (macOS/Linux) ou `C:\Users\<username>\.kaggle\kaggle.json` (Windows)
-
-2. Téléchargez le dataset :
-   ```bash
-   python main.py download
-   ```
-
-##### Option B : Téléchargement Manuel
-
-1. Allez sur Kaggle et recherchez **"RecSys project dataset Food.com"**
-2. Téléchargez le dataset
-3. Extrayez les fichiers **`reviews_clean_full.csv`** et **`recipes_clean_full.csv`** dans `data/raw/`
-   
-   **Note:** Le système utilise maintenant le dataset nettoyé pour de meilleurs résultats. Si les fichiers nettoyés ne sont pas disponibles, le système essaiera automatiquement de charger les fichiers originaux (`reviews.csv` et `recipes.csv`) en fallback.
-
-#### Étape 5 : Préparer les Données
+### 4. Run the application
 
 ```bash
-python main.py preprocess
+python app.py
 ```
 
-Cela va nettoyer les données, extraire les caractéristiques et créer les fichiers nécessaires dans `data/processed/`.
+### 5. Open in your browser
 
-**Temps estimé :** 2-5 minutes selon la taille du dataset.
-
-#### Étape 6 : Lancer le Système
-
-```bash
-python main.py serve
+```
+http://localhost:8000
 ```
 
-Le serveur démarre sur `http://localhost:8000`
+**That's it!** The application is now running with a pre-loaded database containing 522,517 recipes.
 
-**C'est tout !** Vous pouvez maintenant ouvrir votre navigateur et accéder à :
-- **Interface utilisateur :** http://localhost:8000
-- **Documentation API :** http://localhost:8000/docs
+## 📚 API Documentation
 
-## 💻 Utilisation
+Once the server is running, access the interactive API documentation at:
 
-### Démarrer le Système
-
-```bash
-python main.py serve
+```
+http://localhost:8000/docs
 ```
 
-L'API sera accessible sur `http://localhost:8000`
+## 🎯 Main Features
 
-- **Frontend (Interface utilisateur) :** http://localhost:8000
-- **Documentation API interactive :** http://localhost:8000/docs
-- **Health check :** http://localhost:8000/health
+### Web Interface
+- Browse and search recipes
+- Filter by ingredients, time, and dietary preferences
+- View detailed recipe information
+- Get personalized recommendations
 
-### Utiliser le Frontend
+### API Endpoints
+- `GET /` - Web interface
+- `GET /health` - Health check
+- `POST /api/v1/recommend` - Get personalized recommendations
+- `GET /api/v1/recipe/{id}` - Get recipe details
+- `GET /api/v1/recipes/search` - Search recipes
+- `GET /api/v1/ingredients` - Get available ingredients
+- `POST /api/v1/log_interaction` - Log user interactions
 
-1. Ouvrez votre navigateur
-2. Accédez à `http://localhost:8000`
-3. Sélectionnez vos ingrédients disponibles
-4. Optionnel : Spécifiez un temps maximum (minutes)
-5. Optionnel : Sélectionnez vos préférences alimentaires (Végétarien, Végan, Sans gluten, Sans lactose)
-6. Cliquez sur "Chercher des Recettes"
-7. Cliquez sur "Voir la recette" pour afficher les détails complets
+## 🔧 Advanced Usage
 
-### Tester l'API directement
+### Re-train the Model (Optional)
 
-```bash
-# Exemple de requête de recommandation
-curl -X POST "http://localhost:8000/api/v1/recommend" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_id": 1,
-    "available_ingredients": ["tomato", "pasta", "cheese"],
-    "max_time": 30,
-    "dietary_preferences": ["vegetarian"],
-    "top_k": 10
-  }'
-```
-
-### 4. Entraîner le Modèle (Optionnel)
-
-Si vous souhaitez entraîner le modèle GNN depuis zéro :
+The system works out-of-the-box with popularity-based recommendations. To train the GNN model for personalized recommendations:
 
 ```bash
 python main.py train
 ```
 
-**Note importante :** Le système fonctionne sans modèle entraîné en utilisant des recommandations basées sur la popularité et les ingrédients. L'entraînement du modèle GNN est optionnel mais recommandé pour obtenir des recommandations personnalisées.
+**Note:** Training requires processed data and can take 1-2 hours depending on your hardware.
 
-**Pour entraîner le modèle manuellement** (si `python main.py train` n'est pas encore implémenté) :
+### Preprocess Data (Optional)
 
-1. Créez un script Python ou utilisez un notebook Jupyter :
-```python
-from src.data.loader import DataLoader
-from src.data.preprocessing import DataPreprocessor
-from src.data.graph_builder import GraphBuilder
-from src.models.gnn_model import HybridGNN
-from src.training.train import Trainer
-import torch
-import yaml
-from pathlib import Path
+If you want to reprocess the data:
 
-# Load config
-with open("config/config.yaml", "r") as f:
-    config = yaml.safe_load(f)
-
-# Load processed data
-loader = DataLoader()
-data = loader.load_all()
-preprocessor = DataPreprocessor()
-processed_data = preprocessor.process(data["interactions"], data["recipes"])
-
-# Build graph
-graph_builder = GraphBuilder(embedding_dim=config["graph"]["embedding_dim"])
-graph_data = graph_builder.build_hetero_graph(
-    processed_data["train"],
-    processed_data["recipes"],
-    processed_data["mappings"]
-)
-
-# Initialize model
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = HybridGNN(
-    embedding_dim=config["graph"]["embedding_dim"],
-    hidden_dim=config["model"]["gnn"]["hidden_dim"],
-    num_layers=config["model"]["gnn"]["num_layers"],
-    dropout=config["model"]["gnn"]["dropout"]
-)
-model.initialize_embeddings(
-    processed_data["stats"]["n_users"],
-    processed_data["stats"]["n_recipes"],
-    device
-)
-
-# Train
-trainer = Trainer(
-    model=model,
-    train_data=processed_data,
-    val_data=processed_data,
-    config=config["training"],
-    device=device
-)
-
-history = trainer.train(
-    graph_data=graph_data,
-    save_path=Path(config["training"]["save_path"])
-)
+```bash
+python main.py preprocess
 ```
 
-Le modèle entraîné sera sauvegardé dans `models/checkpoints/best_model.pt` et sera automatiquement chargé par l'API au prochain démarrage.
+### Access the Database
 
-## 📁 Structure du Projet
+The application uses SQLite by default (`data/saveeat.db`). You can query it directly or switch to PostgreSQL by setting the `DATABASE_URL` environment variable.
+
+## 📁 Project Structure
 
 ```
 Project/
-├── README.md                      # Ce fichier
-├── requirements.txt               # Dépendances Python
-├── main.py                        # Point d'entrée principal (CLI)
+├── app.py                      # Main entry point
+├── main.py                     # CLI for advanced operations
+├── requirements.txt            # Python dependencies
 ├── config/
-│   └── config.yaml                # Configuration (hyperparamètres, chemins)
+│   └── config.yaml            # Configuration file
 ├── data/
-│   ├── raw/                       # Dataset brut (Food.com)
-│   ├── processed/                 # Données préprocessées
-│   └── saveeat.db                 # Base de données SQLite (créée automatiquement)
-├── models/
-│   └── checkpoints/               # Modèles entraînés (.pt)
+│   ├── raw/                   # Raw dataset files
+│   ├── processed/             # Preprocessed data
+│   └── saveeat.db             # SQLite database (pre-loaded)
 ├── src/
-│   ├── __init__.py
-│   ├── data/
-│   │   ├── __init__.py
-│   │   ├── loader.py              # Chargement du dataset
-│   │   ├── preprocessing.py       # Préprocessing des données
-│   │   └── graph_builder.py       # Construction du graphe
-│   ├── models/
-│   │   ├── __init__.py
-│   │   ├── gnn_model.py           # Architecture GNN hybride
-│   │   ├── text_encoder.py        # Encoder textuel (Transformers)
-│   │   └── reranker.py            # Re-ranking contextuel
-│   ├── training/
-│   │   ├── __init__.py
-│   │   ├── train.py               # Boucle d'entraînement
-│   │   └── evaluation.py          # Métriques (NDCG@10, Recall@20, MRR)
-│   └── api/
-│       ├── __init__.py
-│       ├── main.py                # Application FastAPI
-│       ├── endpoints.py           # Endpoints API
-│       └── database.py              # Gestion base de données
-├── frontend/
-│   ├── index.html                 # Interface utilisateur
-│   └── static/
-│       └── app.js                 # Logique frontend
-└── notebooks/
-    └── exploration.ipynb          # Exploration des données
+│   ├── api/                   # FastAPI application
+│   │   ├── main.py           # FastAPI app definition
+│   │   ├── endpoints.py      # API endpoints
+│   │   └── database.py       # Database models
+│   ├── data/                  # Data processing
+│   │   ├── loader.py         # Data loading
+│   │   ├── preprocessing.py  # Data preprocessing
+│   │   └── graph_builder.py  # Graph construction
+│   ├── models/                # ML models
+│   │   ├── gnn_model.py      # GNN architecture
+│   │   ├── text_encoder.py   # Text embeddings
+│   │   └── reranker.py       # Context-based re-ranking
+│   └── training/              # Training pipeline
+│       ├── train.py          # Training loop
+│       └── evaluation.py     # Evaluation metrics
+└── frontend/
+    ├── index.html            # Web interface
+    └── static/
+        └── app.js            # Frontend logic
 ```
 
-## 📚 Documentation Technique
+## 🛠️ Technology Stack
 
-### Endpoints API
+- **Backend:** Python 3.10+, FastAPI
+- **ML Framework:** PyTorch, PyTorch Geometric
+- **NLP:** Transformers (Sentence-BERT)
+- **Frontend:** HTML5, JavaScript, Tailwind CSS
+- **Database:** SQLite (default) / PostgreSQL (production)
+- **Data:** Food.com dataset (Kaggle)
 
-#### POST `/api/v1/recommend`
+## 📊 Dataset
 
-Obtenir des recommandations de recettes pour un utilisateur.
+- **Source:** Food.com Recipes and Reviews (Kaggle)
+- **Recipes:** 522,517 recipes with ingredients, instructions, and nutrition info
+- **Reviews:** 1,401,982 user reviews and ratings
+- **Pre-processed:** Data is already loaded in `data/saveeat.db`
 
-**Body:**
-```json
-{
-  "user_id": 1,
-  "available_ingredients": ["tomate", "pâtes", "fromage"],
-  "max_time": 30,
-  "dietary_preferences": ["vegetarian"],
-  "top_k": 10
-}
-```
+## 🧪 Testing
 
-**Response:**
-```json
-{
-  "recipe_ids": [123, 456, 789, ...],
-  "scores": [0.95, 0.89, 0.82, ...],
-  "explanations": ["Recommandé: ...", ...]
-}
-```
-
-#### POST `/api/v1/log_interaction`
-
-Logger une interaction utilisateur-recette.
-
-**Body:**
-```json
-{
-  "user_id": 1,
-  "recipe_id": 123,
-  "interaction_type": "click",
-  "rating": 4.5,
-  "available_ingredients": ["tomate", "pâtes"]
-}
-```
-
-#### GET `/api/v1/user/{user_id}/interactions`
-
-Obtenir l'historique des interactions d'un utilisateur.
-
-### Métriques d'Évaluation
-
-- **NDCG@10** : Normalized Discounted Cumulative Gain à 10
-- **Recall@20** : Rappel à 20 recommandations
-- **MRR** : Mean Reciprocal Rank
-
-### Configuration
-
-Les hyperparamètres sont configurables dans `config/config.yaml` :
-
-- Paramètres du modèle GNN
-- Paramètres d'entraînement (batch size, learning rate, etc.)
-- Paramètres de la base de données
-- Paramètres de l'API
-
-## ✅ Vérification Rapide
-
-Pour vérifier que tout fonctionne correctement :
+The system includes comprehensive testing:
 
 ```bash
-# 1. Vérifier que Python est installé
-python --version  # Doit être 3.10+
+# Test the full system
+python -c "from src.api.main import app; print('✅ App loads successfully')"
 
-# 2. Vérifier que les dépendances sont installées
-pip list | grep torch
-pip list | grep fastapi
-
-# 3. Vérifier que les données sont préprocessées
-ls data/processed/train.csv data/processed/recipes.csv
-
-# 4. Tester le serveur
-python main.py serve
-# Dans un autre terminal :
+# Test API endpoints
 curl http://localhost:8000/health
-# Devrait retourner : {"status":"healthy"}
+
+# Test recipe retrieval
+curl http://localhost:8000/api/v1/recipe/38
 ```
 
-## 🐛 Dépannage
+## 🌐 Deployment
 
-### L'API ne démarre pas
+### Local Deployment (Recommended for Demo)
 
-- Vérifiez que le port 8000 n'est pas utilisé : `lsof -i :8000` (macOS/Linux)
-- Vérifiez que toutes les dépendances sont installées : `pip list`
-
-### Le modèle n'est pas trouvé
-
-- Le modèle doit être entraîné d'abord ou téléchargé
-- Vérifiez que `models/checkpoints/best_model.pt` existe
-- L'API fonctionnera sans modèle mais les recommandations ne fonctionneront pas
-
-### Erreur de dataset
-
-- Vérifiez que les fichiers sont dans `data/raw/`
-- Vérifiez les noms de fichiers (peuvent varier selon la version du dataset)
-
-## 🚀 Déploiement
-
-### Déploiement Local (Recommandé pour la démo)
-
-Le système fonctionne parfaitement en local. Pour permettre l'accès depuis d'autres machines sur le même réseau :
-
-1. Démarrez le serveur avec l'option `--host 0.0.0.0` :
-```bash
-python main.py serve --host 0.0.0.0
-```
-
-2. Trouvez l'adresse IP locale de votre machine :
-```bash
-# macOS/Linux
-ifconfig | grep "inet " | grep -v 127.0.0.1
-
-# Windows
-ipconfig
-```
-
-3. Accédez depuis une autre machine sur le même réseau WiFi :
-```
-http://VOTRE_IP_LOCALE:8000
-```
-
-### Déploiement Cloud (Optionnel)
-
-Pour un déploiement cloud, plusieurs options sont disponibles :
-
-#### Google Cloud Run (Recommandé - Free Tier généreux)
-
-1. Créez un `Dockerfile` :
-```dockerfile
-FROM python:3.10-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY . .
-CMD ["python", "main.py", "serve", "--host", "0.0.0.0", "--port", "8080"]
-```
-
-2. Déployez avec Cloud Run :
-```bash
-gcloud run deploy saveeat --source . --platform managed
-```
-
-#### Heroku (Alternative simple)
-
-1. Créez un `Procfile` :
-```
-web: python main.py serve --host 0.0.0.0 --port $PORT
-```
-
-2. Déployez :
-```bash
-heroku create saveeat
-git push heroku main
-```
-
-**Note :** Le déploiement cloud est optionnel. Un déploiement local fonctionnel est parfaitement acceptable pour ce projet.
-
-## 📊 Résumé des Commandes
+The application runs perfectly on localhost. To access from other devices on the same network:
 
 ```bash
-# Télécharger le dataset
-python main.py download
-
-# Préprocesser les données
-python main.py preprocess
-
-# Entraîner le modèle (optionnel)
-python main.py train
-
-# Lancer le serveur
-python main.py serve
-
-# Lancer avec rechargement automatique (développement)
-python main.py serve --reload
-
-# Voir toutes les commandes
-python main.py --help
+python app.py
+# Access from other devices: http://YOUR_LOCAL_IP:8000
 ```
 
-## ⚡ Quick Start (Résumé Ultra-Rapide)
+### Cloud Deployment (Render)
 
-Pour les personnes pressées qui veulent lancer le projet en 10 minutes :
+The project is configured for deployment on Render:
+
+1. Connect your GitHub repository to Render
+2. Create a Web Service
+3. Render will automatically use `build.sh` and `start.sh`
+4. (Optional) Set `DATABASE_URL` for PostgreSQL
+
+## 🔍 Troubleshooting
+
+### Port Already in Use
+
+If port 8000 is already in use:
 
 ```bash
-# 1. Installation
-git clone https://github.com/HugoF1234/RecommenderSystem.git
-cd RecommenderSystem
-python -m venv venv && source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+# Find and kill the process
+lsof -ti:8000 | xargs kill -9
 
-# 2. Données (si pas déjà fait)
-python main.py download && python main.py preprocess
-
-# 3. Lancer
-python main.py serve
-# Ouvrir http://localhost:8000
+# Or change the port in app.py
 ```
 
-**C'est tout !** Le système est maintenant accessible.
+### Dependencies Installation Fails
+
+If PyTorch installation fails, install it separately:
+
+```bash
+# For CPU only
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+```
+
+### Database Issues
+
+The database is pre-loaded in `data/saveeat.db`. If you encounter issues:
+
+```bash
+# Verify database exists
+ls -lh data/saveeat.db
+
+# Should show: ~145 MB file
+```
+
+## 📝 Configuration
+
+Main configuration is in `config/config.yaml`:
+
+- Model hyperparameters (GNN layers, dimensions, dropout)
+- Training parameters (batch size, learning rate, epochs)
+- Database settings (SQLite/PostgreSQL)
+- API configuration (host, port)
+
+## 🎓 Academic Project
+
+This project is part of the "RecSys Startup Sprint" course at ECE Paris.
+
+**Innovation:** Hybrid GNN architecture combining collaborative filtering with content-based filtering using text embeddings and context-aware re-ranking.
+
+**Evaluation Metrics:**
+- NDCG@10 (Normalized Discounted Cumulative Gain)
+- Recall@20
+- MRR (Mean Reciprocal Rank)
+
+## 📄 License
+
+This project is for academic purposes.
+
+## 🙏 Acknowledgments
+
+- Food.com dataset from Kaggle
+- PyTorch Geometric for GNN implementation
+- Sentence-Transformers for text embeddings
 
 ---
 
-**Note** : Ce projet est réalisé dans le cadre du cours "RecSys Startup Sprint" par l'équipe Save Eat.
+**For questions or issues, please contact the team members.**
 
+**Enjoy discovering new recipes! 🍳**
