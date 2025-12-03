@@ -1,18 +1,354 @@
 // Save Eat - Modern Frontend JavaScript
 // Handles all user interactions and API calls
 
+// ============================================================================
+// USER MANAGER - Gestion de l'authentification simple
+// ============================================================================
+
+class UserManager {
+    constructor() {
+        this.currentUserId = null;
+        this.currentUsername = null;
+        this.init();
+    }
+
+    init() {
+        // Charger l'utilisateur depuis localStorage
+        const savedUserId = localStorage.getItem('saveeat_user_id');
+        const savedUsername = localStorage.getItem('saveeat_username');
+
+        if (savedUserId && savedUsername) {
+            this.currentUserId = parseInt(savedUserId);
+            this.currentUsername = savedUsername;
+            console.log(`✅ User logged in: ${this.currentUsername} (ID: ${this.currentUserId})`);
+        } else {
+            // Nouveau utilisateur - demander un pseudo
+            this.promptForUsername();
+        }
+    }
+
+    promptForUsername() {
+        const username = prompt("👋 Bienvenue sur Save Eat!\n\nEntrez votre pseudo pour commencer:");
+
+        if (username && username.trim()) {
+            // Générer un ID utilisateur aléatoire
+            this.currentUserId = Math.floor(Math.random() * 900000) + 100000; // ID entre 100000 et 999999
+            this.currentUsername = username.trim();
+
+            // Sauvegarder dans localStorage
+            localStorage.setItem('saveeat_user_id', this.currentUserId);
+            localStorage.setItem('saveeat_username', this.currentUsername);
+
+            console.log(`✅ New user created: ${this.currentUsername} (ID: ${this.currentUserId})`);
+
+            // Afficher un message de bienvenue
+            this.showWelcomeMessage();
+        } else {
+            // L'utilisateur a annulé ou entré un pseudo vide, réessayer
+            alert("⚠️ Vous devez entrer un pseudo pour utiliser Save Eat");
+            this.promptForUsername();
+        }
+    }
+
+    showWelcomeMessage() {
+        // Message de bienvenue simple
+        console.log(`🎉 Bienvenue ${this.currentUsername}! Vous pouvez maintenant configurer votre profil.`);
+    }
+
+    getUserId() {
+        return this.currentUserId;
+    }
+
+    getUsername() {
+        return this.currentUsername;
+    }
+
+    logout() {
+        if (confirm(`Êtes-vous sûr de vouloir vous déconnecter (${this.currentUsername}) ?`)) {
+            localStorage.removeItem('saveeat_user_id');
+            localStorage.removeItem('saveeat_username');
+            this.currentUserId = null;
+            this.currentUsername = null;
+            console.log('👋 User logged out');
+
+            // Recharger la page pour réinitialiser
+            window.location.reload();
+        }
+    }
+
+    isLoggedIn() {
+        return this.currentUserId !== null && this.currentUsername !== null;
+    }
+}
+
+// ============================================================================
+// USER PROFILE MANAGER - Gestion des profils utilisateurs via API
+// ============================================================================
+
+class UserProfileManager {
+    constructor() {
+        this.currentProfile = null;
+        this.apiBaseUrl = '/api/v1';
+    }
+
+    /**
+     * Charge le profil utilisateur depuis l'API
+     * @param {number} userId - ID de l'utilisateur
+     * @returns {Promise<Object|null>} Le profil ou null si non trouvé
+     */
+    async loadProfile(userId) {
+        try {
+            console.log(`📥 Loading profile for user ${userId}...`);
+            const response = await fetch(`${this.apiBaseUrl}/user/${userId}/profile`);
+
+            if (response.ok) {
+                this.currentProfile = await response.json();
+                console.log('✅ Profile loaded successfully:', this.currentProfile);
+                return this.currentProfile;
+            } else if (response.status === 404) {
+                console.log('ℹ️ No profile found for this user');
+                this.currentProfile = null;
+                return null;
+            } else {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error('❌ Error loading profile:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Sauvegarde un nouveau profil utilisateur
+     * @param {number} userId - ID de l'utilisateur
+     * @param {Object} profileData - Données du profil
+     * @returns {Promise<boolean>} true si succès
+     */
+    async saveProfile(userId, profileData) {
+        try {
+            console.log(`💾 Saving profile for user ${userId}...`, profileData);
+
+            const response = await fetch(`${this.apiBaseUrl}/user/${userId}/profile`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(profileData)
+            });
+
+            if (response.ok) {
+                this.currentProfile = await response.json();
+                console.log('✅ Profile saved successfully');
+                return true;
+            } else {
+                const errorData = await response.json();
+                console.error('❌ Error saving profile:', errorData);
+                return false;
+            }
+        } catch (error) {
+            console.error('❌ Network error saving profile:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Met à jour partiellement le profil existant
+     * @param {number} userId - ID de l'utilisateur
+     * @param {Object} changes - Champs à mettre à jour
+     * @returns {Promise<boolean>} true si succès
+     */
+    async updateProfile(userId, changes) {
+        try {
+            console.log(`🔄 Updating profile for user ${userId}...`, changes);
+
+            const response = await fetch(`${this.apiBaseUrl}/user/${userId}/profile`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(changes)
+            });
+
+            if (response.ok) {
+                this.currentProfile = await response.json();
+                console.log('✅ Profile updated successfully');
+                return true;
+            } else {
+                const errorData = await response.json();
+                console.error('❌ Error updating profile:', errorData);
+                return false;
+            }
+        } catch (error) {
+            console.error('❌ Network error updating profile:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Supprime le profil utilisateur
+     * @param {number} userId - ID de l'utilisateur
+     * @returns {Promise<boolean>} true si succès
+     */
+    async deleteProfile(userId) {
+        try {
+            console.log(`🗑️ Deleting profile for user ${userId}...`);
+
+            const response = await fetch(`${this.apiBaseUrl}/user/${userId}/profile`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                this.currentProfile = null;
+                console.log('✅ Profile deleted successfully');
+                return true;
+            } else {
+                console.error('❌ Error deleting profile');
+                return false;
+            }
+        } catch (error) {
+            console.error('❌ Network error deleting profile:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Retourne le profil en cache
+     * @returns {Object|null} Le profil actuel ou null
+     */
+    getProfile() {
+        return this.currentProfile;
+    }
+
+    /**
+     * Vérifie si un profil est chargé
+     * @returns {boolean} true si un profil existe
+     */
+    hasProfile() {
+        return this.currentProfile !== null;
+    }
+
+    /**
+     * Réinitialise le cache du profil
+     */
+    clearCache() {
+        this.currentProfile = null;
+        console.log('🧹 Profile cache cleared');
+    }
+}
+
+// ============================================================================
+// SAVE EAT APP - Application principale
+// ============================================================================
+
 class SaveEatApp {
     constructor() {
         this.selectedIngredients = new Set();
         this.selectedDietaryPrefs = new Set();
         this.ingredients = [];
+
+        // Initialize user management
+        this.userManager = new UserManager();
+        this.profileManager = new UserProfileManager();
+
         this.init();
     }
 
     async init() {
         console.log('🚀 Initializing Save Eat App...');
+
+        // Display user info in UI
+        this.updateUserDisplay();
+
+        // Load user profile if logged in
+        if (this.userManager.isLoggedIn()) {
+            await this.loadUserProfile();
+        }
+
         await this.loadIngredients();
         this.setupEventListeners();
+    }
+
+    updateUserDisplay() {
+        // Update profile modal with user info
+        const username = this.userManager.getUsername();
+        const userId = this.userManager.getUserId();
+
+        if (username && userId) {
+            document.getElementById('profileUsername').textContent = username;
+            document.getElementById('profileUserId').textContent = `ID: ${userId}`;
+        }
+    }
+
+    async loadUserProfile() {
+        try {
+            const userId = this.userManager.getUserId();
+            const profile = await this.profileManager.loadProfile(userId);
+
+            if (profile) {
+                console.log('✅ User profile loaded');
+                this.populateProfileForm(profile);
+            } else {
+                console.log('ℹ️ No profile found - user can create one');
+            }
+        } catch (error) {
+            console.error('Error loading user profile:', error);
+        }
+    }
+
+    populateProfileForm(profile) {
+        // Populate all form fields with profile data
+        if (profile.allergies) {
+            document.getElementById('profileAllergies').value = profile.allergies.join(', ');
+        }
+
+        if (profile.dietary_restrictions) {
+            // Check corresponding checkboxes
+            document.querySelectorAll('.dietary-checkbox').forEach(checkbox => {
+                checkbox.checked = profile.dietary_restrictions.includes(checkbox.value);
+            });
+        }
+
+        if (profile.disliked_ingredients) {
+            document.getElementById('profileDisliked').value = profile.disliked_ingredients.join(', ');
+        }
+
+        if (profile.favorite_cuisines) {
+            document.getElementById('profileCuisines').value = profile.favorite_cuisines.join(', ');
+        }
+
+        // Nutritional values
+        if (profile.max_calories) {
+            document.getElementById('profileMaxCalories').value = profile.max_calories;
+        }
+        if (profile.min_protein) {
+            document.getElementById('profileMinProtein').value = profile.min_protein;
+        }
+        if (profile.max_carbs) {
+            document.getElementById('profileMaxCarbs').value = profile.max_carbs;
+        }
+        if (profile.max_fat) {
+            document.getElementById('profileMaxFat').value = profile.max_fat;
+        }
+
+        // Cooking preferences
+        if (profile.max_prep_time) {
+            document.getElementById('profileMaxPrepTime').value = profile.max_prep_time;
+        }
+        if (profile.skill_level) {
+            document.getElementById('profileSkillLevel').value = profile.skill_level;
+        }
+
+        // Taste preferences (sliders)
+        if (profile.spice_tolerance !== null && profile.spice_tolerance !== undefined) {
+            document.getElementById('profileSpiceTolerance').value = profile.spice_tolerance;
+            document.getElementById('spiceValue').textContent = profile.spice_tolerance;
+        }
+        if (profile.sweetness_preference !== null && profile.sweetness_preference !== undefined) {
+            document.getElementById('profileSweetness').value = profile.sweetness_preference;
+            document.getElementById('sweetnessValue').textContent = profile.sweetness_preference;
+        }
+
+        console.log('✅ Profile form populated');
     }
 
     async loadIngredients() {
@@ -77,6 +413,37 @@ class SaveEatApp {
     }
 
     setupEventListeners() {
+        // Profile button - Open modal
+        document.getElementById('profileButton').addEventListener('click', () => {
+            this.openProfileModal();
+        });
+
+        // Close modal buttons
+        document.getElementById('closeProfileModal').addEventListener('click', () => {
+            this.closeProfileModal();
+        });
+
+        document.getElementById('cancelProfileButton').addEventListener('click', () => {
+            this.closeProfileModal();
+        });
+
+        // Save profile button
+        document.getElementById('saveProfileButton').addEventListener('click', () => {
+            this.saveProfile();
+        });
+
+        // Delete profile button
+        document.getElementById('deleteProfileButton').addEventListener('click', () => {
+            this.deleteProfile();
+        });
+
+        // Close modal on backdrop click
+        document.getElementById('profileModal').addEventListener('click', (e) => {
+            if (e.target.id === 'profileModal') {
+                this.closeProfileModal();
+            }
+        });
+
         // Dietary preferences
         document.querySelectorAll('.dietary-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -104,6 +471,150 @@ class SaveEatApp {
         });
     }
 
+    // ========================================================================
+    // PROFILE MODAL METHODS
+    // ========================================================================
+
+    openProfileModal() {
+        document.getElementById('profileModal').classList.remove('hidden');
+        console.log('📖 Profile modal opened');
+    }
+
+    closeProfileModal() {
+        document.getElementById('profileModal').classList.add('hidden');
+        console.log('📕 Profile modal closed');
+    }
+
+    async saveProfile() {
+        try {
+            const userId = this.userManager.getUserId();
+
+            // Collect form data
+            const profileData = this.collectProfileData();
+
+            console.log('💾 Saving profile...', profileData);
+
+            // Save or update profile
+            const success = await this.profileManager.saveProfile(userId, profileData);
+
+            if (success) {
+                alert('✅ Profil enregistré avec succès !');
+                this.closeProfileModal();
+            } else {
+                alert('❌ Erreur lors de l\'enregistrement du profil');
+            }
+        } catch (error) {
+            console.error('Error saving profile:', error);
+            alert('❌ Erreur: ' + error.message);
+        }
+    }
+
+    collectProfileData() {
+        const data = {};
+
+        // Allergies
+        const allergies = document.getElementById('profileAllergies').value.trim();
+        if (allergies) {
+            data.allergies = allergies.split(',').map(a => a.trim()).filter(a => a);
+        }
+
+        // Dietary restrictions (checkboxes)
+        const restrictions = [];
+        document.querySelectorAll('.dietary-checkbox:checked').forEach(checkbox => {
+            restrictions.push(checkbox.value);
+        });
+        if (restrictions.length > 0) {
+            data.dietary_restrictions = restrictions;
+        }
+
+        // Disliked ingredients
+        const disliked = document.getElementById('profileDisliked').value.trim();
+        if (disliked) {
+            data.disliked_ingredients = disliked.split(',').map(d => d.trim()).filter(d => d);
+        }
+
+        // Favorite cuisines
+        const cuisines = document.getElementById('profileCuisines').value.trim();
+        if (cuisines) {
+            data.favorite_cuisines = cuisines.split(',').map(c => c.trim()).filter(c => c);
+        }
+
+        // Nutritional constraints
+        const maxCalories = document.getElementById('profileMaxCalories').value;
+        if (maxCalories) data.max_calories = parseFloat(maxCalories);
+
+        const minProtein = document.getElementById('profileMinProtein').value;
+        if (minProtein) data.min_protein = parseFloat(minProtein);
+
+        const maxCarbs = document.getElementById('profileMaxCarbs').value;
+        if (maxCarbs) data.max_carbs = parseFloat(maxCarbs);
+
+        const maxFat = document.getElementById('profileMaxFat').value;
+        if (maxFat) data.max_fat = parseFloat(maxFat);
+
+        // Cooking preferences
+        const maxPrepTime = document.getElementById('profileMaxPrepTime').value;
+        if (maxPrepTime) data.max_prep_time = parseFloat(maxPrepTime);
+
+        const skillLevel = document.getElementById('profileSkillLevel').value;
+        if (skillLevel) data.skill_level = skillLevel;
+
+        // Taste preferences
+        const spiceTolerance = document.getElementById('profileSpiceTolerance').value;
+        if (spiceTolerance) data.spice_tolerance = parseInt(spiceTolerance);
+
+        const sweetness = document.getElementById('profileSweetness').value;
+        if (sweetness) data.sweetness_preference = parseInt(sweetness);
+
+        return data;
+    }
+
+    async deleteProfile() {
+        if (!confirm('⚠️ Êtes-vous sûr de vouloir supprimer votre profil alimentaire ?')) {
+            return;
+        }
+
+        try {
+            const userId = this.userManager.getUserId();
+            const success = await this.profileManager.deleteProfile(userId);
+
+            if (success) {
+                alert('✅ Profil supprimé avec succès');
+                this.clearProfileForm();
+                this.closeProfileModal();
+            } else {
+                alert('❌ Erreur lors de la suppression');
+            }
+        } catch (error) {
+            console.error('Error deleting profile:', error);
+            alert('❌ Erreur: ' + error.message);
+        }
+    }
+
+    clearProfileForm() {
+        // Clear all form fields
+        document.getElementById('profileAllergies').value = '';
+        document.getElementById('profileDisliked').value = '';
+        document.getElementById('profileCuisines').value = '';
+        document.getElementById('profileMaxCalories').value = '';
+        document.getElementById('profileMinProtein').value = '';
+        document.getElementById('profileMaxCarbs').value = '';
+        document.getElementById('profileMaxFat').value = '';
+        document.getElementById('profileMaxPrepTime').value = '';
+        document.getElementById('profileSkillLevel').value = '';
+        document.getElementById('profileSpiceTolerance').value = '5';
+        document.getElementById('profileSweetness').value = '5';
+        document.getElementById('spiceValue').textContent = '5';
+        document.getElementById('sweetnessValue').textContent = '5';
+
+        // Uncheck all dietary checkboxes
+        document.querySelectorAll('.dietary-checkbox').forEach(checkbox => {
+            checkbox.checked = false;
+        });
+
+        console.log('🧹 Profile form cleared');
+    }
+
     async searchRecipes() {
         if (this.selectedIngredients.size === 0) {
             alert('⚠️ Veuillez sélectionner au moins un ingrédient');
@@ -123,10 +634,14 @@ class SaveEatApp {
             const maxCalories = document.getElementById('maxCalories').value;
             const topK = parseInt(document.getElementById('topK').value) || 10;
 
+            // Use actual user ID from UserManager
+            const userId = this.userManager.getUserId() || 1;
+
             const requestBody = {
-                user_id: 1,
+                user_id: userId,
                 available_ingredients: Array.from(this.selectedIngredients),
-                top_k: topK
+                top_k: topK,
+                use_profile: true  // Enable profile-based filtering
             };
 
             if (maxTime) requestBody.max_time = parseFloat(maxTime);
@@ -136,6 +651,7 @@ class SaveEatApp {
             }
 
             console.log('🔍 Searching recipes with:', requestBody);
+            console.log(`👤 Using profile filtering for user ${userId}`);
 
             const response = await fetch('/api/v1/recommend', {
                 method: 'POST',

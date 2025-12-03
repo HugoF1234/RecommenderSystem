@@ -65,12 +65,50 @@ class Review(Base):
     )
 
 
+class UserProfile(Base):
+    """
+    User profile table for storing user preferences and information
+    """
+    __tablename__ = "user_profiles"
+
+    user_id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, nullable=True, index=True)
+    email = Column(String, nullable=True, unique=True)
+
+    # Dietary preferences
+    dietary_restrictions = Column(JSON, nullable=True)  # ["vegetarian", "vegan", "gluten-free", etc.]
+    allergies = Column(JSON, nullable=True)  # ["nuts", "dairy", "eggs", etc.]
+
+    # Cuisine preferences
+    favorite_cuisines = Column(JSON, nullable=True)  # ["italian", "mexican", "asian", etc.]
+    disliked_ingredients = Column(JSON, nullable=True)  # List of ingredients to avoid
+    favorite_ingredients = Column(JSON, nullable=True)  # List of preferred ingredients
+
+    # Nutritional preferences
+    max_calories = Column(Float, nullable=True)  # Maximum calories per recipe
+    min_protein = Column(Float, nullable=True)  # Minimum protein (g)
+    max_carbs = Column(Float, nullable=True)  # Maximum carbs (g)
+    max_fat = Column(Float, nullable=True)  # Maximum fat (g)
+
+    # Cooking preferences
+    max_prep_time = Column(Float, nullable=True)  # Maximum preparation time in minutes
+    skill_level = Column(String, nullable=True)  # "beginner", "intermediate", "advanced"
+
+    # Taste preferences (scale 0-10)
+    spice_tolerance = Column(Integer, nullable=True)  # 0 (no spice) to 10 (very spicy)
+    sweetness_preference = Column(Integer, nullable=True)  # 0 (not sweet) to 10 (very sweet)
+
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class Interaction(Base):
     """
     Interaction table for logging user-recipe interactions
     """
     __tablename__ = "interactions"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, index=True)
     recipe_id = Column(Integer, index=True)
@@ -78,7 +116,7 @@ class Interaction(Base):
     review = Column(Text, nullable=True)
     interaction_type = Column(String, default="view")  # view, click, like, rate
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
-    
+
     # Contextual information
     available_ingredients = Column(Text, nullable=True)  # JSON string
     session_id = Column(String, nullable=True)
@@ -493,10 +531,10 @@ class Database:
     def get_recipe_by_id(self, recipe_id: int) -> Optional[Dict]:
         """
         Get recipe by ID
-        
+
         Args:
             recipe_id: Recipe ID
-            
+
         Returns:
             Recipe dictionary or None
         """
@@ -505,7 +543,7 @@ class Database:
             recipe = session.query(Recipe).filter(Recipe.recipe_id == recipe_id).first()
             if not recipe:
                 return None
-            
+
             return {
                 "recipe_id": recipe.recipe_id,
                 "name": recipe.name,
@@ -532,4 +570,193 @@ class Database:
             return None
         finally:
             session.close()
+
+    def create_user_profile(
+        self,
+        user_id: int,
+        username: Optional[str] = None,
+        email: Optional[str] = None,
+        **preferences
+    ) -> Dict:
+        """
+        Create or update user profile
+
+        Args:
+            user_id: User ID
+            username: Username
+            email: Email address
+            **preferences: Additional preference fields
+
+        Returns:
+            Created/updated profile dictionary
+        """
+        session = self.get_session()
+        try:
+            # Check if profile exists
+            profile = session.query(UserProfile).filter(UserProfile.user_id == user_id).first()
+
+            if profile:
+                # Update existing profile
+                if username is not None:
+                    profile.username = username
+                if email is not None:
+                    profile.email = email
+
+                # Update preferences
+                for key, value in preferences.items():
+                    if hasattr(profile, key):
+                        setattr(profile, key, value)
+
+                profile.updated_at = datetime.utcnow()
+                logger.info(f"Updated profile for user {user_id}")
+            else:
+                # Create new profile
+                profile = UserProfile(
+                    user_id=user_id,
+                    username=username,
+                    email=email,
+                    **preferences
+                )
+                session.add(profile)
+                logger.info(f"Created profile for user {user_id}")
+
+            session.commit()
+            session.refresh(profile)
+
+            return self._profile_to_dict(profile)
+
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Failed to create/update profile: {e}")
+            raise
+        finally:
+            session.close()
+
+    def get_user_profile(self, user_id: int) -> Optional[Dict]:
+        """
+        Get user profile by user ID
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            Profile dictionary or None
+        """
+        session = self.get_session()
+        try:
+            profile = session.query(UserProfile).filter(UserProfile.user_id == user_id).first()
+
+            if not profile:
+                return None
+
+            return self._profile_to_dict(profile)
+
+        except Exception as e:
+            logger.error(f"Failed to get profile: {e}")
+            return None
+        finally:
+            session.close()
+
+    def update_user_preferences(
+        self,
+        user_id: int,
+        preferences: Dict
+    ) -> Dict:
+        """
+        Update specific user preferences
+
+        Args:
+            user_id: User ID
+            preferences: Dictionary of preferences to update
+
+        Returns:
+            Updated profile dictionary
+        """
+        session = self.get_session()
+        try:
+            profile = session.query(UserProfile).filter(UserProfile.user_id == user_id).first()
+
+            if not profile:
+                # Create new profile if doesn't exist
+                profile = UserProfile(user_id=user_id)
+                session.add(profile)
+
+            # Update preferences
+            for key, value in preferences.items():
+                if hasattr(profile, key):
+                    setattr(profile, key, value)
+
+            profile.updated_at = datetime.utcnow()
+            session.commit()
+            session.refresh(profile)
+
+            logger.info(f"Updated preferences for user {user_id}")
+            return self._profile_to_dict(profile)
+
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Failed to update preferences: {e}")
+            raise
+        finally:
+            session.close()
+
+    def delete_user_profile(self, user_id: int) -> bool:
+        """
+        Delete user profile
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            True if deleted, False otherwise
+        """
+        session = self.get_session()
+        try:
+            profile = session.query(UserProfile).filter(UserProfile.user_id == user_id).first()
+
+            if not profile:
+                return False
+
+            session.delete(profile)
+            session.commit()
+            logger.info(f"Deleted profile for user {user_id}")
+            return True
+
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Failed to delete profile: {e}")
+            return False
+        finally:
+            session.close()
+
+    def _profile_to_dict(self, profile: UserProfile) -> Dict:
+        """
+        Convert UserProfile object to dictionary
+
+        Args:
+            profile: UserProfile object
+
+        Returns:
+            Profile dictionary
+        """
+        return {
+            "user_id": profile.user_id,
+            "username": profile.username,
+            "email": profile.email,
+            "dietary_restrictions": profile.dietary_restrictions,
+            "allergies": profile.allergies,
+            "favorite_cuisines": profile.favorite_cuisines,
+            "disliked_ingredients": profile.disliked_ingredients,
+            "favorite_ingredients": profile.favorite_ingredients,
+            "max_calories": profile.max_calories,
+            "min_protein": profile.min_protein,
+            "max_carbs": profile.max_carbs,
+            "max_fat": profile.max_fat,
+            "max_prep_time": profile.max_prep_time,
+            "skill_level": profile.skill_level,
+            "spice_tolerance": profile.spice_tolerance,
+            "sweetness_preference": profile.sweetness_preference,
+            "created_at": profile.created_at.isoformat() if profile.created_at else None,
+            "updated_at": profile.updated_at.isoformat() if profile.updated_at else None,
+        }
 
