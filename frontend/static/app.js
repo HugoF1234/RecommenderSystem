@@ -1,345 +1,502 @@
-/**
- * Save Eat - Frontend Application
- */
+// Save Eat - Modern Frontend JavaScript
+// Handles all user interactions and API calls
 
-// Auto-detect API URL: use current host in production, localhost in development
-const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:8000/api/v1'
-    : `${window.location.protocol}//${window.location.host}/api/v1`;
+class SaveEatApp {
+    constructor() {
+        this.selectedIngredients = new Set();
+        this.selectedDietaryPrefs = new Set();
+        this.ingredients = [];
+        this.init();
+    }
 
-// DOM Elements
-const searchBtn = document.getElementById('searchBtn');
-const loadingDiv = document.getElementById('loading');
-const resultsSection = document.getElementById('results');
-const recipeGrid = document.getElementById('recipeGrid');
-const ingredientsContainer = document.getElementById('ingredientsContainer');
+    async init() {
+        console.log('🚀 Initializing Save Eat App...');
+        await this.loadIngredients();
+        this.setupEventListeners();
+    }
 
-// Event Listeners
-searchBtn.addEventListener('click', handleSearch);
-document.addEventListener('DOMContentLoaded', loadIngredients);
-
-// Store recipe data cache
-let recipeDataCache = {};
-
-/**
- * Load available ingredients from API
- */
-async function loadIngredients() {
-    try {
-        const response = await fetch(`${API_BASE_URL}/ingredients?limit=500`);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        
-        const data = await response.json();
-        const ingredients = data.ingredients || [];
-        
-        // Check if there's a message about missing data
-        if (ingredients.length === 0 && data.message) {
-            ingredientsContainer.innerHTML = `<div class="col-span-full text-center text-yellow-600 text-sm py-4">${data.message}</div>`;
-            return;
-        }
-        
-        if (ingredients.length === 0) {
-            ingredientsContainer.innerHTML = '<div class="col-span-full text-center text-gray-500 text-sm py-4">Aucun ingrédient disponible. Veuillez charger les données.</div>';
-            return;
-        }
-        
-        ingredientsContainer.innerHTML = '';
-        
-        ingredients.forEach(ingredient => {
-            const label = document.createElement('label');
-            label.className = 'flex items-center space-x-2 p-2 rounded hover:bg-white cursor-pointer';
+    async loadIngredients() {
+        try {
+            const response = await fetch('/api/v1/ingredients?limit=500');
+            const data = await response.json();
             
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.value = ingredient;
-            checkbox.className = 'ingredient-checkbox rounded text-coral focus:ring-coral';
-            
-            const span = document.createElement('span');
-            span.className = 'text-sm text-gray-700';
-            span.textContent = ingredient.charAt(0).toUpperCase() + ingredient.slice(1);
-            
-            label.appendChild(checkbox);
-            label.appendChild(span);
-            ingredientsContainer.appendChild(label);
-        });
-    } catch (error) {
-        console.error('Error loading ingredients:', error);
-        ingredientsContainer.innerHTML = '<div class="col-span-full text-center text-red-500 text-sm py-4">Erreur lors du chargement des ingrédients</div>';
-    }
-}
-
-/**
- * Handle recipe search
- */
-async function handleSearch() {
-    const maxTime = document.getElementById('maxTime').value ? parseFloat(document.getElementById('maxTime').value) : null;
-    const topK = 10;
-    
-    const availableIngredients = Array.from(document.querySelectorAll('.ingredient-checkbox:checked'))
-        .map(cb => cb.value);
-    
-    const dietaryPrefs = Array.from(document.querySelectorAll('.dietary-pref:checked'))
-        .map(cb => cb.value);
-    
-    if (availableIngredients.length === 0) {
-        alert('Veuillez sélectionner au moins un ingrédient');
-        return;
-    }
-    
-    loadingDiv.classList.remove('hidden');
-    resultsSection.classList.add('hidden');
-    
-    try {
-        const response = await fetch(`${API_BASE_URL}/recommend`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                user_id: 1,
-                available_ingredients: availableIngredients,
-                max_time: maxTime,
-                dietary_preferences: dietaryPrefs.length > 0 ? dietaryPrefs : null,
-                top_k: topK
-            })
-        });
-        
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        
-        const data = await response.json();
-        loadingDiv.classList.add('hidden');
-        displayRecipes(data);
-    } catch (error) {
-        console.error('Error fetching recommendations:', error);
-        loadingDiv.classList.add('hidden');
-        alert('Erreur lors de la recherche. Assurez-vous que l\'API est démarrée.');
-    }
-}
-
-/**
- * Display recipe recommendations
- */
-function displayRecipes(data) {
-    recipeGrid.innerHTML = '';
-    
-    if (!data.recipe_ids || data.recipe_ids.length === 0) {
-        recipeGrid.innerHTML = '<div class="col-span-full bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center text-yellow-800">Aucune recette trouvée</div>';
-        resultsSection.classList.remove('hidden');
-        return;
-    }
-    
-    // Fetch recipe images in parallel
-    data.recipe_ids.forEach(recipeId => {
-        fetch(`${API_BASE_URL}/recipe/${recipeId}`)
-            .then(response => response.ok ? response.json() : null)
-            .then(recipe => { if (recipe) recipeDataCache[recipeId] = recipe; })
-            .catch(err => console.warn(`Could not fetch recipe ${recipeId}:`, err));
-    });
-    
-    // Create recipe cards
-    data.recipe_ids.forEach((recipeId, index) => {
-        const score = data.scores ? data.scores[index] : null;
-        const explanation = data.explanations ? data.explanations[index] : null;
-        const card = createRecipeCard(recipeId, score, explanation);
-        recipeGrid.appendChild(card);
-    });
-    
-    resultsSection.classList.remove('hidden');
-}
-
-/**
- * Create a recipe card element
- */
-function createRecipeCard(recipeId, score, explanation) {
-    const card = document.createElement('div');
-    card.className = 'bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-shadow border border-gray-100';
-    
-    // Extract recipe name from explanation
-    let recipeName = `Recette #${recipeId}`;
-    if (explanation) {
-        const parts = explanation.split(':');
-        if (parts.length > 1) {
-            recipeName = parts[parts.length - 1].trim();
-        }
-    }
-    
-    // Get image from cache
-    const imageUrl = recipeDataCache[recipeId]?.image_url || null;
-    const imageHtml = imageUrl ? `
-        <div class="mb-3 overflow-hidden rounded-lg">
-            <img src="${imageUrl}" alt="${recipeName}" class="w-full h-40 object-cover" 
-                 onerror="this.style.display='none';">
-        </div>
-    ` : '';
-    
-    // Score display
-    let scoreDisplay = '';
-    if (score !== null && score !== undefined) {
-        const scorePercent = Math.round(score * 100);
-        scoreDisplay = `
-            <div class="mb-3">
-                <div class="flex items-center justify-between mb-1">
-                    <span class="text-xs text-gray-600">Pertinence</span>
-                    <span class="text-xs font-semibold text-gray-700">${scorePercent}%</span>
+            if (data.ingredients && data.ingredients.length > 0) {
+                this.ingredients = data.ingredients;
+                this.renderIngredients();
+                console.log(`✅ Loaded ${this.ingredients.length} ingredients`);
+            } else {
+                console.warn('No ingredients found');
+                document.getElementById('ingredientsContainer').innerHTML = `
+                    <div class="text-center w-full py-4 text-gray-500">
+                        <p class="font-medium">Aucun ingrédient disponible</p>
+                        <p class="text-sm">Rechargez la page ou vérifiez la base de données</p>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Error loading ingredients:', error);
+            document.getElementById('ingredientsContainer').innerHTML = `
+                <div class="text-center w-full py-4 text-red-500">
+                    <p class="font-medium">Erreur de chargement</p>
+                    <p class="text-sm">${error.message}</p>
                 </div>
-                <div class="w-full bg-gray-200 rounded-full h-2">
-                    <div class="bg-gradient-to-r from-coral to-orange h-2 rounded-full" style="width: ${scorePercent}%"></div>
+            `;
+        }
+    }
+
+    renderIngredients() {
+        const container = document.getElementById('ingredientsContainer');
+        container.innerHTML = this.ingredients.map(ing => `
+            <button 
+                data-ingredient="${ing}"
+                class="ingredient-chip px-4 py-2 rounded-full bg-white border-2 border-gray-300 text-gray-700 hover:border-green-500 hover:bg-green-50 text-sm font-medium transition-all">
+                ${this.capitalize(ing)}
+            </button>
+        `).join('');
+
+        // Add click listeners
+        container.querySelectorAll('.ingredient-chip').forEach(btn => {
+            btn.addEventListener('click', (e) => this.toggleIngredient(e.target));
+        });
+    }
+
+    toggleIngredient(btn) {
+        const ingredient = btn.dataset.ingredient;
+        
+        if (this.selectedIngredients.has(ingredient)) {
+            this.selectedIngredients.delete(ingredient);
+            btn.classList.remove('bg-green-500', 'text-white', 'border-green-500');
+            btn.classList.add('bg-white', 'text-gray-700', 'border-gray-300');
+        } else {
+            this.selectedIngredients.add(ingredient);
+            btn.classList.remove('bg-white', 'text-gray-700', 'border-gray-300');
+            btn.classList.add('bg-green-500', 'text-white', 'border-green-500');
+        }
+
+        console.log(`Selected ingredients: ${Array.from(this.selectedIngredients).join(', ')}`);
+    }
+
+    setupEventListeners() {
+        // Dietary preferences
+        document.querySelectorAll('.dietary-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const pref = e.target.dataset.pref;
+                if (this.selectedDietaryPrefs.has(pref)) {
+                    this.selectedDietaryPrefs.delete(pref);
+                    e.target.classList.remove('bg-green-500', 'text-white', 'border-green-500');
+                    e.target.classList.add('border-gray-300', 'text-gray-700');
+                } else {
+                    this.selectedDietaryPrefs.add(pref);
+                    e.target.classList.remove('border-gray-300', 'text-gray-700');
+                    e.target.classList.add('bg-green-500', 'text-white', 'border-green-500');
+                }
+            });
+        });
+
+        // Search button
+        document.getElementById('searchBtn').addEventListener('click', () => this.searchRecipes());
+
+        // Enter key on inputs
+        ['maxTime', 'maxCalories', 'topK'].forEach(id => {
+            document.getElementById(id).addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') this.searchRecipes();
+            });
+        });
+    }
+
+    async searchRecipes() {
+        if (this.selectedIngredients.size === 0) {
+            alert('⚠️ Veuillez sélectionner au moins un ingrédient');
+            return;
+        }
+
+        // Show loading
+        document.getElementById('resultsSection').classList.add('hidden');
+        document.getElementById('emptyState').classList.add('hidden');
+        document.getElementById('loadingState').classList.remove('hidden');
+
+        // Scroll to results
+        document.getElementById('loadingState').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        try {
+            const maxTime = document.getElementById('maxTime').value;
+            const maxCalories = document.getElementById('maxCalories').value;
+            const topK = parseInt(document.getElementById('topK').value) || 10;
+
+            const requestBody = {
+                user_id: 1,
+                available_ingredients: Array.from(this.selectedIngredients),
+                top_k: topK
+            };
+
+            if (maxTime) requestBody.max_time = parseFloat(maxTime);
+            if (maxCalories) requestBody.max_calories = parseFloat(maxCalories);
+            if (this.selectedDietaryPrefs.size > 0) {
+                requestBody.dietary_preferences = Array.from(this.selectedDietaryPrefs);
+            }
+
+            console.log('🔍 Searching recipes with:', requestBody);
+
+            const response = await fetch('/api/v1/recommend', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            const data = await response.json();
+            console.log('✅ Received recommendations:', data);
+
+            // Hide loading
+            document.getElementById('loadingState').classList.add('hidden');
+
+            if (data.recipe_ids && data.recipe_ids.length > 0) {
+                await this.displayRecipes(data);
+            } else {
+                document.getElementById('emptyState').classList.remove('hidden');
+            }
+
+        } catch (error) {
+            console.error('Error searching recipes:', error);
+            document.getElementById('loadingState').classList.add('hidden');
+            alert(`❌ Erreur: ${error.message}`);
+        }
+    }
+
+    async displayRecipes(data) {
+        const { recipe_ids, scores, explanations } = data;
+        
+        // Fetch full recipe details
+        const recipes = await Promise.all(
+            recipe_ids.map(async (id, idx) => {
+                try {
+                    const response = await fetch(`/api/v1/recipe/${id}`);
+                    const recipe = await response.json();
+                    recipe.score = scores[idx];
+                    recipe.explanation = explanations ? explanations[idx] : '';
+                    return recipe;
+                } catch (error) {
+                    console.error(`Error fetching recipe ${id}:`, error);
+                    return null;
+                }
+            })
+        );
+
+        const validRecipes = recipes.filter(r => r !== null);
+
+        if (validRecipes.length === 0) {
+            document.getElementById('emptyState').classList.remove('hidden');
+            return;
+        }
+
+        // Update count
+        document.getElementById('resultsCount').textContent = validRecipes.length;
+
+        // Render recipes
+        const grid = document.getElementById('recipesGrid');
+        grid.innerHTML = validRecipes.map(recipe => this.createRecipeCard(recipe)).join('');
+
+        // Show results
+        document.getElementById('resultsSection').classList.remove('hidden');
+        document.getElementById('resultsSection').classList.add('fade-in');
+
+        // Smooth scroll
+        document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    createRecipeCard(recipe) {
+        const {
+            recipe_id,
+            name,
+            description,
+            image_url,
+            minutes,
+            calories,
+            protein,
+            carbohydrates,
+            total_fat,
+            ingredients_list,
+            n_ingredients,
+            tags,
+            score,
+            explanation
+        } = recipe;
+
+        // Nutrition info
+        const nutritionHTML = this.createNutritionBars(calories, protein, carbohydrates, total_fat);
+
+        // Tags (first 3)
+        const displayTags = tags && tags.length > 0 ? tags.slice(0, 3) : [];
+        const tagsHTML = displayTags.map(tag => 
+            `<span class="badge px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">${tag}</span>`
+        ).join('');
+
+        // Match score badge
+        const matchPercent = Math.round(score * 100);
+        const matchColor = matchPercent >= 80 ? 'bg-green-500' : matchPercent >= 60 ? 'bg-yellow-500' : 'bg-gray-500';
+
+        // Image with fallback
+        const imageHTML = image_url ? 
+            `<img src="${image_url}" alt="${name}" class="w-full h-48 object-cover" onerror="this.src='https://via.placeholder.com/400x300?text=Save+Eat'">` :
+            `<div class="w-full h-48 bg-gradient-to-br from-green-100 to-blue-100 flex items-center justify-center">
+                <svg class="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"></path>
+                </svg>
+            </div>`;
+
+        return `
+            <div class="recipe-card bg-white rounded-xl shadow-lg overflow-hidden">
+                <!-- Image -->
+                ${imageHTML}
+                
+                <!-- Content -->
+                <div class="p-5">
+                    <!-- Header -->
+                    <div class="flex items-start justify-between mb-3">
+                        <h3 class="text-lg font-bold text-gray-900 line-clamp-2 flex-1">
+                            ${name || 'Recette sans titre'}
+                        </h3>
+                        <div class="${matchColor} text-white px-2 py-1 rounded-lg text-xs font-bold ml-2">
+                            ${matchPercent}%
+                        </div>
+                    </div>
+
+                    <!-- Description -->
+                    ${description ? `<p class="text-sm text-gray-600 line-clamp-2 mb-3">${description}</p>` : ''}
+
+                    <!-- Stats -->
+                    <div class="flex items-center justify-between mb-3 text-sm text-gray-600">
+                        <div class="flex items-center space-x-4">
+                            ${minutes ? `
+                                <span class="flex items-center">
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    ${Math.round(minutes)} min
+                                </span>
+                            ` : ''}
+                            ${calories ? `
+                                <span class="flex items-center">
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"></path>
+                                    </svg>
+                                    ${Math.round(calories)} cal
+                                </span>
+                            ` : ''}
+                        </div>
+                        ${n_ingredients ? `
+                            <span class="text-xs font-medium text-gray-500">
+                                ${n_ingredients} ingrédients
+                            </span>
+                        ` : ''}
+                    </div>
+
+                    <!-- Nutrition Bars -->
+                    ${nutritionHTML}
+
+                    <!-- Tags -->
+                    ${tagsHTML ? `
+                        <div class="flex flex-wrap gap-1 mb-3">
+                            ${tagsHTML}
+                        </div>
+                    ` : ''}
+
+                    <!-- Explanation -->
+                    ${explanation ? `
+                        <div class="text-xs text-gray-600 bg-gray-50 rounded-lg p-2 mb-3">
+                            ${explanation}
+                        </div>
+                    ` : ''}
+
+                    <!-- Actions -->
+                    <button onclick="app.viewRecipe(${recipe_id})" 
+                            class="w-full bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-all transform hover:scale-[1.02]">
+                        Voir la recette
+                    </button>
                 </div>
             </div>
         `;
     }
-    
-    card.innerHTML = `
-        <div class="flex flex-col h-full">
-            ${imageHtml}
-            <h4 class="text-lg font-bold text-gray-800 mb-2 line-clamp-2">${recipeName}</h4>
-            ${scoreDisplay}
-            ${explanation ? `<p class="text-sm text-gray-600 mb-4 line-clamp-2">${explanation.replace(/^(✅|⚠️)\s*/, '')}</p>` : ''}
-            <button 
-                onclick="viewRecipe(${recipeId})"
-                class="mt-auto bg-gradient-to-r from-coral to-orange text-white px-4 py-2 rounded-lg hover:opacity-90 transition-opacity text-sm font-semibold"
-            >
-                Voir la recette
-            </button>
-        </div>
-    `;
-    
-    return card;
-}
 
-/**
- * View recipe details
- */
-async function viewRecipe(recipeId) {
-    const modal = document.getElementById('recipeModal');
-    const modalName = document.getElementById('modalRecipeName');
-    const modalContent = document.getElementById('modalRecipeContent');
-    
-    modal.classList.remove('hidden');
-    modalName.textContent = 'Chargement...';
-    modalContent.innerHTML = '<div class="text-center py-8"><div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-coral"></div><p class="mt-4 text-gray-600">Chargement...</p></div>';
-    
-    try {
-        const [recipeResponse, reviewsResponse] = await Promise.all([
-            fetch(`${API_BASE_URL}/recipe/${recipeId}`),
-            fetch(`${API_BASE_URL}/recipe/${recipeId}/reviews`)
-        ]);
+    createNutritionBars(calories, protein, carbs, fat) {
+        if (!calories && !protein && !carbs && !fat) return '';
+
+        // Calculate percentages (based on daily values)
+        const dailyValues = {
+            calories: 2000,
+            protein: 50,
+            carbs: 300,
+            fat: 70
+        };
+
+        const items = [];
         
-        if (!recipeResponse.ok) throw new Error(`HTTP error! status: ${recipeResponse.status}`);
-        
-        const recipe = await recipeResponse.json();
-        const reviewsData = reviewsResponse.ok ? await reviewsResponse.json() : { reviews: [] };
-        
-        recipeDataCache[recipeId] = recipe;
-        modalName.textContent = recipe.name || `Recette #${recipeId}`;
-        
-        let html = '';
-        
-        // Recipe image
-        if (recipe.image_url) {
-            html += `<div class="mb-6 overflow-hidden rounded-lg">
-                <img src="${recipe.image_url}" alt="${recipe.name}" class="w-full h-64 object-cover" 
-                     onerror="this.style.display='none';">
-            </div>`;
+        if (calories) {
+            const percent = Math.min((calories / dailyValues.calories) * 100, 100);
+            items.push({ label: 'Calories', value: Math.round(calories), percent, color: 'bg-red-500' });
         }
-        
-        // Description
-        if (recipe.description && recipe.description.trim() !== '') {
-            html += `<div class="mb-6 p-4 bg-gray-50 rounded-lg">
-                <h3 class="text-lg font-semibold text-gray-800 mb-2">Description</h3>
-                <p class="text-gray-700">${recipe.description}</p>
-            </div>`;
+        if (protein) {
+            const percent = Math.min((protein / dailyValues.protein) * 100, 100);
+            items.push({ label: 'Protéines', value: Math.round(protein), percent, color: 'bg-blue-500' });
         }
-        
-        // Info badges
-        html += '<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">';
-        if (recipe.prep_time > 0) {
-            const hours = Math.floor(recipe.prep_time / 60);
-            const minutes = recipe.prep_time % 60;
-            const timeDisplay = hours > 0 ? `${hours}h${minutes > 0 ? minutes : ''}` : `${minutes}min`;
-            html += `<div class="bg-orange-50 rounded-lg p-3 text-center border border-orange-200">
-                <p class="text-xs text-gray-600 mb-1">⏱️ Temps</p>
-                <p class="text-lg font-bold text-orange">${timeDisplay}</p>
-            </div>`;
+        if (carbs) {
+            const percent = Math.min((carbs / dailyValues.carbs) * 100, 100);
+            items.push({ label: 'Glucides', value: Math.round(carbs), percent, color: 'bg-yellow-500' });
         }
-        if (recipe.calories > 0) {
-            html += `<div class="bg-rose-50 rounded-lg p-3 text-center border border-rose-200">
-                <p class="text-xs text-gray-600 mb-1">🔥 Calories</p>
-                <p class="text-lg font-bold text-rose">${Math.round(recipe.calories)}</p>
-            </div>`;
+        if (fat) {
+            const percent = Math.min((fat / dailyValues.fat) * 100, 100);
+            items.push({ label: 'Lipides', value: Math.round(fat), percent, color: 'bg-purple-500' });
         }
-        if (recipe.protein > 0) {
-            html += `<div class="bg-violet-50 rounded-lg p-3 text-center border border-violet-200">
-                <p class="text-xs text-gray-600 mb-1">💪 Protéines</p>
-                <p class="text-lg font-bold text-violet">${Math.round(recipe.protein)}g</p>
-            </div>`;
-        }
-        if (recipe.carbohydrates > 0) {
-            html += `<div class="bg-teal-50 rounded-lg p-3 text-center border border-teal-200">
-                <p class="text-xs text-gray-600 mb-1">🌾 Glucides</p>
-                <p class="text-lg font-bold text-teal">${Math.round(recipe.carbohydrates)}g</p>
-            </div>`;
-        }
-        html += '</div>';
-        
-        // Ingredients
-        if (recipe.ingredients && recipe.ingredients.length > 0) {
-            html += `<div class="mb-6">
-                <h3 class="text-lg font-semibold text-gray-800 mb-3">Ingrédients (${recipe.ingredients.length})</h3>
-                <ul class="grid grid-cols-1 md:grid-cols-2 gap-2">`;
-            recipe.ingredients.forEach(ingredient => {
-                const ingName = String(ingredient).charAt(0).toUpperCase() + String(ingredient).slice(1);
-                html += `<li class="flex items-center space-x-2 p-2 bg-gray-50 border border-gray-200 rounded">
-                    <span class="text-gray-700">${ingName}</span>
-                </li>`;
-            });
-            html += '</ul></div>';
-        }
-        
-        // Steps
-        if (recipe.steps && recipe.steps.length > 0) {
-            html += `<div class="mb-6">
-                <h3 class="text-lg font-semibold text-gray-800 mb-3">Instructions (${recipe.steps.length} étapes)</h3>
-                <ol class="space-y-2">`;
-            recipe.steps.forEach((step, index) => {
-                html += `<li class="flex items-start space-x-3 p-3 bg-gray-50 rounded border border-gray-200">
-                    <span class="flex-shrink-0 w-6 h-6 bg-coral text-white rounded-full flex items-center justify-center text-sm font-bold">${index + 1}</span>
-                    <span class="text-gray-700">${step}</span>
-                </li>`;
-            });
-            html += '</ol></div>';
-        }
-        
-        // Reviews
-        if (reviewsData.reviews && reviewsData.reviews.length > 0) {
-            html += `<div class="mb-6">
-                <h3 class="text-lg font-semibold text-gray-800 mb-3">Avis (${reviewsData.reviews.length})</h3>
-                <div class="space-y-3">`;
-            reviewsData.reviews.forEach(review => {
-                const stars = review.rating ? '⭐'.repeat(Math.round(review.rating)) : '';
-                html += `<div class="p-3 bg-yellow-50 border border-yellow-200 rounded">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="font-semibold text-gray-800">${review.author || 'Anonymous'}</span>
-                        ${review.rating ? `<span class="text-yellow-500">${stars} (${review.rating}/5)</span>` : ''}
+
+        return `
+            <div class="space-y-2 mb-3">
+                ${items.map(item => `
+                    <div>
+                        <div class="flex justify-between text-xs text-gray-600 mb-1">
+                            <span>${item.label}</span>
+                            <span class="font-semibold">${item.value}${item.label === 'Calories' ? '' : 'g'}</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-1.5">
+                            <div class="nutrition-bar ${item.color} h-1.5 rounded-full" style="width: ${item.percent}%"></div>
+                        </div>
                     </div>
-                    ${review.review ? `<p class="text-gray-700 text-sm">${review.review}</p>` : ''}
-                </div>`;
+                `).join('')}
+            </div>
+        `;
+    }
+
+    async viewRecipe(recipeId) {
+        try {
+            const response = await fetch(`/api/v1/recipe/${recipeId}`);
+            const recipe = await response.json();
+
+            // Create modal
+            const modal = this.createRecipeModal(recipe);
+            document.body.insertAdjacentHTML('beforeend', modal);
+
+            // Add close listener
+            document.getElementById('recipeModal').addEventListener('click', (e) => {
+                if (e.target.id === 'recipeModal' || e.target.id === 'closeModal') {
+                    document.getElementById('recipeModal').remove();
+                }
             });
-            html += '</div></div>';
+
+            // Log interaction
+            await fetch('/api/v1/log_interaction', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: 1,
+                    recipe_id: recipeId,
+                    interaction_type: 'view',
+                    available_ingredients: Array.from(this.selectedIngredients)
+                })
+            });
+
+        } catch (error) {
+            console.error('Error viewing recipe:', error);
+            alert(`Erreur: ${error.message}`);
         }
-        
-        modalContent.innerHTML = html;
-    } catch (error) {
-        console.error('Error loading recipe:', error);
-        modalContent.innerHTML = '<div class="text-center py-8"><p class="text-red-500 mb-4">Erreur lors du chargement</p></div>';
+    }
+
+    createRecipeModal(recipe) {
+        const {
+            name,
+            description,
+            image_url,
+            ingredients_list,
+            steps_list,
+            minutes,
+            calories,
+            protein,
+            carbohydrates,
+            total_fat,
+            tags
+        } = recipe;
+
+        const ingredientsHTML = ingredients_list && ingredients_list.length > 0 ?
+            ingredients_list.map(ing => `<li class="flex items-start"><span class="text-green-500 mr-2">•</span> ${this.capitalize(ing)}</li>`).join('') :
+            '<li class="text-gray-500">Aucun ingrédient disponible</li>';
+
+        const stepsHTML = steps_list && steps_list.length > 0 ?
+            steps_list.map((step, idx) => `
+                <div class="flex items-start mb-3">
+                    <div class="flex-shrink-0 w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-bold mr-3">
+                        ${idx + 1}
+                    </div>
+                    <p class="text-gray-700 flex-1 pt-1">${step}</p>
+                </div>
+            `).join('') :
+            '<p class="text-gray-500">Aucune instruction disponible</p>';
+
+        return `
+            <div id="recipeModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+                <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto relative">
+                    <!-- Close button -->
+                    <button id="closeModal" class="absolute top-4 right-4 bg-white rounded-full p-2 shadow-lg hover:bg-gray-100 z-10">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+
+                    <!-- Image -->
+                    ${image_url ? `
+                        <img src="${image_url}" alt="${name}" class="w-full h-64 object-cover rounded-t-2xl" 
+                             onerror="this.style.display='none'">
+                    ` : ''}
+
+                    <!-- Content -->
+                    <div class="p-8">
+                        <h2 class="text-3xl font-bold text-gray-900 mb-2">${name || 'Recette'}</h2>
+                        ${description ? `<p class="text-gray-600 mb-4">${description}</p>` : ''}
+
+                        <!-- Stats -->
+                        <div class="flex flex-wrap gap-4 mb-6">
+                            ${minutes ? `
+                                <div class="flex items-center text-gray-700">
+                                    <svg class="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    <span class="font-semibold">${Math.round(minutes)} min</span>
+                                </div>
+                            ` : ''}
+                            ${calories ? `
+                                <div class="flex items-center text-gray-700">
+                                    <svg class="w-5 h-5 mr-2 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"></path>
+                                    </svg>
+                                    <span class="font-semibold">${Math.round(calories)} cal</span>
+                                </div>
+                            ` : ''}
+                            ${protein ? `<span class="text-sm text-gray-600">Protéines: ${Math.round(protein)}g</span>` : ''}
+                            ${carbohydrates ? `<span class="text-sm text-gray-600">Glucides: ${Math.round(carbohydrates)}g</span>` : ''}
+                            ${total_fat ? `<span class="text-sm text-gray-600">Lipides: ${Math.round(total_fat)}g</span>` : ''}
+                        </div>
+
+                        <!-- Ingredients -->
+                        <div class="mb-6">
+                            <h3 class="text-xl font-bold text-gray-900 mb-3">🥕 Ingrédients</h3>
+                            <ul class="space-y-2 text-gray-700">${ingredientsHTML}</ul>
+                        </div>
+
+                        <!-- Steps -->
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-3">👨‍🍳 Instructions</h3>
+                            <div>${stepsHTML}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    capitalize(str) {
+        if (!str) return '';
+        return str.charAt(0).toUpperCase() + str.slice(1);
     }
 }
 
-/**
- * Close recipe modal
- */
-function closeRecipeModal() {
-    document.getElementById('recipeModal').classList.add('hidden');
-}
-
-// Make functions globally available
-window.viewRecipe = viewRecipe;
-window.closeRecipeModal = closeRecipeModal;
+// Initialize app
+const app = new SaveEatApp();
+console.log('✅ Save Eat App initialized');
