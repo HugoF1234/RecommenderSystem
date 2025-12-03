@@ -8,7 +8,7 @@ echo "=== Upgrading pip ==="
 pip install --upgrade pip setuptools wheel
 
 echo "=== Installing PyTorch CPU-only (lightweight, ~200MB vs ~2GB with CUDA) ==="
-pip install torch>=2.0.0 --index-url https://download.pytorch.org/whl/cpu
+pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
 
 echo "=== Installing remaining dependencies (torch already satisfied) ==="
 pip install -r requirements.txt
