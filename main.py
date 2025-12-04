@@ -44,7 +44,39 @@ def main():
     
     if args.command == "preprocess":
         print("Preprocessing dataset...")
-        # Import and run preprocessing
+        
+        # Try to load from database first (if available)
+        db_path = Path("data/saveeat.db")
+        if db_path.exists():
+            print(f"✅ Found database at {db_path}")
+            print("   Loading data from database...")
+            try:
+                from src.data.db_to_processed import preprocess_from_db
+                import os
+                
+                # Determine database type
+                db_type = "sqlite"
+                if os.getenv("DATABASE_URL"):
+                    db_type = "postgresql"
+                    db_path = os.getenv("DATABASE_URL")
+                
+                processed_data, graph_data = preprocess_from_db(
+                    db_path=str(db_path),
+                    database_type=db_type,
+                    output_path=Path(args.output_path)
+                )
+                
+                print(f"✅ Preprocessing complete!")
+                print(f"   - {processed_data['stats']['n_users']} users")
+                print(f"   - {processed_data['stats']['n_recipes']} recipes")
+                print(f"   - Graph: {graph_data.num_nodes} nodes, {graph_data.num_edges} edges")
+                return
+            except Exception as e:
+                print(f"⚠️  Error loading from database: {e}")
+                print("   Falling back to CSV files...")
+        
+        # Fallback: Load from CSV files
+        print("   Loading data from CSV files...")
         from src.data.loader import DataLoader
         from src.data.preprocessing import DataPreprocessor
         import yaml
@@ -78,7 +110,7 @@ def main():
             save_path=Path(args.output_path)
         )
         
-        print(f"Preprocessing complete! Processed {processed_data['stats']['n_users']} users and {processed_data['stats']['n_recipes']} recipes.")
+        print(f"✅ Preprocessing complete! Processed {processed_data['stats']['n_users']} users and {processed_data['stats']['n_recipes']} recipes.")
         
     elif args.command == "download":
         print("Downloading cleaned dataset from Kaggle...")

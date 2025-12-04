@@ -106,18 +106,169 @@ reranker = None
 mappings = None
 
 
-def initialize_model(model_path: str, graph_data_path: str, recipe_data_path: str, mappings_path: str):
+def initialize_model(model_path: Optional[str], graph_data_path: str, recipe_data_path: str, mappings_path: str):
     """Initialize model and data (called at startup)"""
     global model, graph_data, recipe_data, reranker, mappings
     
-    # Load model, graph_data, recipe_data, mappings
-    # This is a placeholder - actual implementation depends on how data is stored
-    logger.info("Initializing model...")
-    # model = HybridGNN(...)
-    # model.load_state_dict(torch.load(model_path))
-    # etc.
+    import torch
+    import pickle
+    import pandas as pd
+    from pathlib import Path
+    import yaml
+    import os
     
-    logger.info("Model initialized")
+    logger.info("🚀 Initializing model and data...")
+    
+    try:
+        # Load config for model parameters
+        config_path = Path(__file__).parent.parent.parent / "config" / "config.yaml"
+        config = {}
+        if config_path.exists():
+            with open(config_path, "r") as f:
+                config = yaml.safe_load(f)
+        
+        model_config = config.get("model", {})
+        gnn_config = model_config.get("gnn", {})
+        text_config = model_config.get("text_encoder", {})
+        reranker_config = model_config.get("reranker", {})
+        graph_config = config.get("graph", {})
+        training_config = config.get("training", {})
+        
+        # 1. Load mappings
+        if not Path(mappings_path).exists():
+            logger.warning(f"❌ Mappings file not found: {mappings_path}")
+            logger.warning("   Model will not be loaded. Please run: python main.py preprocess")
+            return
+        
+        with open(mappings_path, 'rb') as f:
+            mappings = pickle.load(f)
+        
+        n_users = len(mappings.get("user_to_idx", {}))
+        n_recipes = len(mappings.get("recipe_to_idx", {}))
+        logger.info(f"✅ Loaded mappings: {n_users} users, {n_recipes} recipes")
+        
+        # 2. Load graph data
+        if not Path(graph_data_path).exists():
+            logger.warning(f"❌ Graph data file not found: {graph_data_path}")
+            logger.warning("   Model will not be loaded. Please build graph first.")
+            return
+        
+        # PyTorch 2.6+ requires weights_only=False for HeteroData objects
+        try:
+            graph_data = torch.load(graph_data_path, map_location="cpu", weights_only=False)
+        except TypeError:
+            # Fallback for older PyTorch versions
+            graph_data = torch.load(graph_data_path, map_location="cpu")
+        logger.info(f"✅ Loaded graph data")
+        if hasattr(graph_data, 'num_nodes'):
+            logger.info(f"   Graph nodes: {graph_data.num_nodes}")
+        if hasattr(graph_data, 'num_edges'):
+            logger.info(f"   Graph edges: {graph_data.num_edges}")
+        
+        # 3. Load recipe data
+        if not Path(recipe_data_path).exists():
+            logger.warning(f"❌ Recipe data file not found: {recipe_data_path}")
+            logger.warning("   Model will not be loaded. Please run: python main.py preprocess")
+            return
+        
+        recipe_data = pd.read_csv(recipe_data_path)
+        logger.info(f"✅ Loaded recipe data: {len(recipe_data)} recipes")
+        
+        # 4. Determine device
+        device_str = training_config.get("device", "cpu")
+        if device_str == "cuda" and not torch.cuda.is_available():
+            logger.warning("CUDA requested but not available, using CPU")
+            device_str = "cpu"
+        device = torch.device(device_str)
+        logger.info(f"✅ Using device: {device}")
+        
+        # 5. Initialize GNN model
+        embedding_dim = graph_config.get("embedding_dim", 128)
+        hidden_dim = gnn_config.get("hidden_dim", 256)
+        num_layers = gnn_config.get("num_layers", 2)
+        dropout = gnn_config.get("dropout", 0.3)
+        activation = gnn_config.get("activation", "relu")
+        text_embedding_dim = text_config.get("embedding_dim", 384)
+        
+        from ..models.gnn_model import HybridGNN
+        
+        model = HybridGNN(
+            embedding_dim=embedding_dim,
+            hidden_dim=hidden_dim,
+            num_layers=num_layers,
+            dropout=dropout,
+            activation=activation,
+            text_embedding_dim=text_embedding_dim,
+            use_text_features=True
+        )
+        
+        # Initialize embeddings
+        model.initialize_embeddings(n_users, n_recipes, device)
+        model = model.to(device)
+        
+        # Load trained weights if available
+        if model_path and Path(model_path).exists():
+            try:
+                # PyTorch 2.6+ requires weights_only=False for state_dict
+                try:
+                    checkpoint = torch.load(model_path, map_location=device, weights_only=False)
+                except TypeError:
+                    # Fallback for older PyTorch versions
+                    checkpoint = torch.load(model_path, map_location=device)
+                
+                # Handle different checkpoint formats
+                if isinstance(checkpoint, dict):
+                    if 'model_state_dict' in checkpoint:
+                        model.load_state_dict(checkpoint['model_state_dict'])
+                        logger.info(f"✅ Loaded model weights from checkpoint (epoch {checkpoint.get('epoch', '?')})")
+                    else:
+                        # Assume it's a state_dict directly
+                        model.load_state_dict(checkpoint)
+                        logger.info(f"✅ Loaded model weights from {model_path}")
+                else:
+                    model.load_state_dict(checkpoint)
+                    logger.info(f"✅ Loaded model weights from {model_path}")
+            except Exception as e:
+                logger.warning(f"⚠️  Could not load model weights: {e}")
+                logger.warning("   Using random initialization (model will need training)")
+        else:
+            if model_path:
+                logger.warning(f"⚠️  Model checkpoint not found: {model_path}")
+            else:
+                logger.info("ℹ️  No model checkpoint path provided")
+            logger.warning("   Using random initialization (model will need training)")
+            logger.warning("   To train: python main.py train")
+        
+        model.eval()
+        logger.info("✅ GNN model initialized")
+        
+        # 6. Initialize reranker
+        from ..models.reranker import ContextualReranker
+        
+        reranker = ContextualReranker(
+            input_dim=embedding_dim,
+            hidden_dims=reranker_config.get("hidden_dims", [256, 128, 64]),
+            dropout=reranker_config.get("dropout", 0.2),
+            context_dim=50
+        )
+        reranker = reranker.to(device)
+        reranker.eval()
+        logger.info("✅ Contextual reranker initialized")
+        
+        logger.info("🎉 Model initialization complete!")
+        logger.info(f"   - GNN: {n_users} users × {n_recipes} recipes")
+        logger.info(f"   - Device: {device}")
+        logger.info(f"   - Model ready for recommendations")
+        
+    except Exception as e:
+        logger.error(f"❌ Error initializing model: {e}", exc_info=True)
+        # Reset globals on error
+        model = None
+        graph_data = None
+        recipe_data = None
+        reranker = None
+        mappings = None
+        logger.error("   Model will not be available. Using fallback recommendations.")
 
 
 @router.get("/recipe/{recipe_id}")
@@ -405,23 +556,27 @@ async def recommend(
         # Get user embedding
         user_idx = mappings["user_to_idx"].get(request.user_id)
         if user_idx is None:
-            # Cold start: return popular recipes
-            return RecommendationResponse(
-                recipe_ids=[],
-                scores=[],
-                explanations=["New user: Please rate some recipes first"]
-            )
+            # Cold start: use fallback recommendations (popular recipes)
+            logger.info(f"User {request.user_id} not in mappings (cold start), using fallback recommendations")
+            return await _get_fallback_recommendations(request)
         
         # Get base recommendations from GNN
+        logger.info(f"🔍 Getting GNN recommendations for user {request.user_id} (idx: {user_idx})")
         model.eval()
         with torch.no_grad():
-            embeddings = model(graph_data)
+            # Move graph data to same device as model
+            device = next(model.parameters()).device
+            graph_data_device = graph_data.to(device)
+            
+            # Forward pass through GNN
+            embeddings = model(graph_data_device)
             
             user_emb = embeddings["user_embeddings"][user_idx]
             recipe_embs = embeddings["recipe_embeddings"]
             
-            # Compute scores
+            # Compute scores (dot product)
             scores = torch.matmul(user_emb.unsqueeze(0), recipe_embs.T).squeeze().cpu().numpy()
+            logger.info(f"✅ Computed scores for {len(scores)} recipes (min: {scores.min():.4f}, max: {scores.max():.4f}, mean: {scores.mean():.4f})")
         
         # Re-rank if contextual information provided
         if request.available_ingredients or request.max_time or request.dietary_preferences:
@@ -436,13 +591,26 @@ async def recommend(
                     recipe_id = mappings["idx_to_recipe"][recipe_idx]
                     recipe = recipe_data[recipe_data["recipe_id"] == recipe_id].iloc[0]
                     
+                    # Get recipe ingredients (handle different formats)
                     recipe_ingredients = recipe.get("ingredients_list", [])
-                    prep_time = recipe.get("prep_time", 30)
+                    if isinstance(recipe_ingredients, str):
+                        import ast
+                        try:
+                            recipe_ingredients = ast.literal_eval(recipe_ingredients)
+                        except:
+                            recipe_ingredients = []
+                    if not isinstance(recipe_ingredients, list):
+                        recipe_ingredients = []
+                    
+                    prep_time = recipe.get("minutes", recipe.get("prep_time", 30))
+                    import pandas as pd
+                    if pd.isna(prep_time):
+                        prep_time = 30
                     
                     context = reranker.encode_context(
                         available_ingredients=request.available_ingredients or [],
                         recipe_ingredients=recipe_ingredients,
-                        prep_time=prep_time,
+                        prep_time=float(prep_time),
                         max_time=request.max_time,
                         dietary_preferences=request.dietary_preferences
                     )
@@ -450,8 +618,10 @@ async def recommend(
                     reranked_scores.append(scores[recipe_idx])
                 
                 if context_features:
-                    context_tensor = torch.stack(context_features)
-                    scores_tensor = torch.tensor(reranked_scores)
+                    # Move to device
+                    device = next(reranker.parameters()).device
+                    context_tensor = torch.stack(context_features).to(device)
+                    scores_tensor = torch.tensor(reranked_scores, dtype=torch.float32).to(device)
                     
                     reranked_scores = reranker.forward(scores_tensor, context_tensor).cpu().numpy()
                     
@@ -469,13 +639,74 @@ async def recommend(
         recipe_ids = [mappings["idx_to_recipe"][idx] for idx in top_recipe_indices]
         final_scores = scores[top_recipe_indices].tolist()
         
-        # Generate explanations (simplified)
+        logger.info(f"✅ GNN selected {len(recipe_ids)} top recipes")
+        
+        # Apply user profile filters if requested (after GNN scoring)
+        if request.use_profile and len(recipe_ids) > 0:
+            try:
+                from .main import db_instance
+                if db_instance:
+                    user_profile = db_instance.get_user_profile(request.user_id)
+                    if user_profile:
+                        logger.info(f"🔍 Applying profile filters to {len(recipe_ids)} GNN recommendations...")
+                        # Filter recipe_ids based on profile (allergies only - most critical)
+                        filtered_recipe_ids = []
+                        filtered_scores = []
+                        
+                        for recipe_id, score in zip(recipe_ids, final_scores):
+                            recipe = recipe_data[recipe_data["recipe_id"] == recipe_id]
+                            if not recipe.empty:
+                                recipe_row = recipe.iloc[0]
+                                should_include = True
+                                
+                                # Check allergies only (safety critical)
+                                if user_profile.get('allergies'):
+                                    recipe_ingredients = recipe_row.get("ingredients_list", [])
+                                    if isinstance(recipe_ingredients, str):
+                                        import ast
+                                        try:
+                                            recipe_ingredients = ast.literal_eval(recipe_ingredients)
+                                        except:
+                                            recipe_ingredients = []
+                                    if not isinstance(recipe_ingredients, list):
+                                        recipe_ingredients = []
+                                    
+                                    for allergen in user_profile['allergies']:
+                                        allergen_lower = allergen.lower().strip()
+                                        for ing in recipe_ingredients:
+                                            if allergen_lower in str(ing).lower():
+                                                should_include = False
+                                                break
+                                        if not should_include:
+                                            break
+                                
+                                if should_include:
+                                    filtered_recipe_ids.append(recipe_id)
+                                    filtered_scores.append(score)
+                        
+                        if len(filtered_recipe_ids) > 0:
+                            logger.info(f"✅ After allergy filter: {len(filtered_recipe_ids)} recipes")
+                            recipe_ids = filtered_recipe_ids
+                            final_scores = filtered_scores
+                        else:
+                            logger.warning("⚠️  All recipes filtered out by allergies, returning top GNN recommendations anyway")
+            except Exception as e:
+                logger.warning(f"Error applying profile filters: {e}, returning GNN recommendations")
+        
+        # Generate explanations
         explanations = []
         for recipe_id in recipe_ids:
-            recipe = recipe_data[recipe_data["recipe_id"] == recipe_id].iloc[0]
-            name = recipe.get("name", f"Recipe {recipe_id}")
-            explanations.append(f"Recommended: {name}")
+            recipe = recipe_data[recipe_data["recipe_id"] == recipe_id]
+            if not recipe.empty:
+                recipe_row = recipe.iloc[0]
+                name = recipe_row.get("name", recipe_row.get("Name", f"Recipe {recipe_id}"))
+                explanations.append(f"Recommended: {name}")
         
+        if len(recipe_ids) == 0:
+            logger.warning("⚠️  No recipes from GNN, falling back to popular recipes")
+            return await _get_fallback_recommendations(request)
+        
+        logger.info(f"🎉 Returning {len(recipe_ids)} recommendations from GNN")
         return RecommendationResponse(
             recipe_ids=recipe_ids,
             scores=final_scores,
@@ -932,15 +1163,36 @@ async def _get_fallback_recommendations(request: RecommendationRequest) -> Recom
                         recipes_df = apply_user_profile_filters(recipes_df, user_profile)
 
                         if len(recipes_df) == 0:
-                            logger.warning("No recipes match user profile constraints")
-                            return RecommendationResponse(
-                                recipe_ids=[],
-                                scores=[],
-                                explanations=[
-                                    "Aucune recette ne correspond à vos préférences. "
-                                    "Essayez d'assouplir certaines contraintes dans votre profil."
-                                ],
-                            )
+                            logger.warning("⚠️  No recipes match user profile constraints after filtering")
+                            logger.warning("   Relaxing filters to return some recommendations...")
+                            # Re-load recipes without profile filters (too restrictive)
+                            from .main import db_instance
+                            if db_instance:
+                                session = db_instance.get_session()
+                                try:
+                                    from .database import Recipe
+                                    recipes_query = session.query(
+                                        Recipe.recipe_id,
+                                        Recipe.name,
+                                        Recipe.minutes,
+                                        Recipe.calories,
+                                        Recipe.ingredients_list
+                                    )
+                                    recipes_df = pd.read_sql(recipes_query.statement, session.bind)
+                                    logger.info(f"   Reloaded {len(recipes_df)} recipes without strict profile filters")
+                                finally:
+                                    session.close()
+                            
+                            # If still empty, return error
+                            if recipes_df.empty:
+                                return RecommendationResponse(
+                                    recipe_ids=[],
+                                    scores=[],
+                                    explanations=[
+                                        "Aucune recette trouvée. "
+                                        "Essayez avec moins de filtres ou d'autres ingrédients."
+                                    ],
+                                )
                     else:
                         logger.info(f"No profile found for user {request.user_id}")
             except Exception as e:

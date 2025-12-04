@@ -56,10 +56,11 @@ class GraphBuilder:
         
         # Create edge indices: [source, target]
         # Users -> Recipes
+        # Use int64 to handle large IDs
         edge_index = torch.tensor([
-            user_indices.tolist(),
-            recipe_indices_offset.tolist()
-        ], dtype=torch.long)
+            user_indices.astype(np.int64).tolist(),
+            recipe_indices_offset.astype(np.int64).tolist()
+        ], dtype=torch.int64)
         
         # Edge attributes (ratings)
         if edge_attr and edge_attr in interactions.columns:
@@ -122,9 +123,9 @@ class GraphBuilder:
             edge_index = torch.tensor([
                 recipe_indices,
                 ingredient_indices
-            ], dtype=torch.long)
+            ], dtype=torch.int64)
         else:
-            edge_index = torch.empty((2, 0), dtype=torch.long)
+            edge_index = torch.empty((2, 0), dtype=torch.int64)
         
         logger.info(f"Built recipe-ingredient graph: {len(recipe_indices)} edges, {n_ingredients} ingredients")
         

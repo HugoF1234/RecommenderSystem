@@ -90,10 +90,10 @@ class HybridGNN(nn.Module):
             self.convs.append(
                 HeteroConv({
                     ("user", "interacts_with", "recipe"): GATConv(
-                        embedding_dim, gat_out_dim, heads=gat_heads, concat=True, dropout=dropout
+                        embedding_dim, gat_out_dim, heads=gat_heads, concat=True, dropout=dropout, add_self_loops=False
                     ),
                     ("recipe", "contains", "ingredient"): GATConv(
-                        embedding_dim, gat_out_dim, heads=gat_heads, concat=True, dropout=dropout
+                        embedding_dim, gat_out_dim, heads=gat_heads, concat=True, dropout=dropout, add_self_loops=False
                     ),
                 }, aggr="mean")
             )
@@ -104,10 +104,10 @@ class HybridGNN(nn.Module):
                 self.convs.append(
                     HeteroConv({
                         ("user", "interacts_with", "recipe"): GATConv(
-                            hidden_dim, gat_out_dim, heads=gat_heads, concat=True, dropout=dropout
+                            hidden_dim, gat_out_dim, heads=gat_heads, concat=True, dropout=dropout, add_self_loops=False
                         ),
                         ("recipe", "contains", "ingredient"): GATConv(
-                            hidden_dim, gat_out_dim, heads=gat_heads, concat=True, dropout=dropout
+                            hidden_dim, gat_out_dim, heads=gat_heads, concat=True, dropout=dropout, add_self_loops=False
                         ),
                     }, aggr="mean")
                 )

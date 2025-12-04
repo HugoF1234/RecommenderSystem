@@ -154,17 +154,42 @@ async def startup_event():
             finally:
                 session.close()
             
-            # Initialize model (placeholder - implement based on actual model loading)
+            # Initialize model (can work with or without trained checkpoint)
             model_path = Path("models/checkpoints/best_model.pt")
             graph_data_path = Path("data/processed/graph.pt")
             recipe_data_path = Path("data/processed/recipes.csv")
             mappings_path = Path("data/processed/mappings.pkl")
             
-            # Check if files exist before initializing
-            if model_path.exists():
-                initialize_model(str(model_path), str(graph_data_path), str(recipe_data_path), str(mappings_path))
+            # Check if essential files exist (mappings, graph, recipes are required)
+            # Model checkpoint is optional (will use random weights if not found)
+            essential_files_exist = (
+                mappings_path.exists() and 
+                graph_data_path.exists() and 
+                recipe_data_path.exists()
+            )
+            
+            if essential_files_exist:
+                # Initialize model (will use checkpoint if available, otherwise random weights)
+                initialize_model(
+                    str(model_path) if model_path.exists() else None,
+                    str(graph_data_path), 
+                    str(recipe_data_path), 
+                    str(mappings_path)
+                )
             else:
-                logger.warning("Model not found - API will run but recommendations won't work")
+                missing_files = []
+                if not mappings_path.exists():
+                    missing_files.append(f"mappings.pkl ({mappings_path})")
+                if not graph_data_path.exists():
+                    missing_files.append(f"graph.pt ({graph_data_path})")
+                if not recipe_data_path.exists():
+                    missing_files.append(f"recipes.csv ({recipe_data_path})")
+                
+                logger.warning("⚠️  Model cannot be loaded - missing essential files:")
+                for file in missing_files:
+                    logger.warning(f"   - {file}")
+                logger.warning("   Run: python main.py preprocess")
+                logger.warning("   API will run but recommendations will use fallback method")
         else:
             logger.warning("Config file not found, using defaults")
             # Initialize database with smart defaults
