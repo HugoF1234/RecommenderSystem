@@ -45,7 +45,7 @@ class UserManager {
     }
 
     promptForUsername() {
-        const username = prompt("👋 Bienvenue sur Save Eat!\n\nEntrez votre pseudo pour commencer:");
+        const username = prompt("👋 Welcome on Save Eat!\n\nEnter your username to begin:");
 
         if (username && username.trim()) {
             // Générer un ID utilisateur aléatoire
@@ -62,14 +62,14 @@ class UserManager {
             this.showWelcomeMessage();
         } else {
             // L'utilisateur a annulé ou entré un pseudo vide, réessayer
-            alert("⚠️ Vous devez entrer un pseudo pour utiliser Save Eat");
+            alert("⚠️ Must enter a username");
             this.promptForUsername();
         }
     }
 
     showWelcomeMessage() {
         // Message de bienvenue simple
-        console.log(`🎉 Bienvenue ${this.currentUsername}! Vous pouvez maintenant configurer votre profil.`);
+        console.log(`🎉 Welcome ${this.currentUsername}! You can now manage your profil.`);
     }
 
     getUserId() {
@@ -81,7 +81,7 @@ class UserManager {
     }
 
     logout() {
-        if (confirm(`Êtes-vous sûr de vouloir vous déconnecter (${this.currentUsername}) ?`)) {
+        if (confirm(`Are you sure you want to disconnect (${this.currentUsername}) ?`)) {
             localStorage.removeItem('saveeat_user_id');
             localStorage.removeItem('saveeat_username');
             this.currentUserId = null;
@@ -553,26 +553,26 @@ class SaveEatApp {
                 'dairy-free': 'Sans lactose'
             };
             const labels = profile.dietary_restrictions.map(r => restrictionLabels[r] || r);
-            summaryItems.push(`🥗 Régime: ${labels.join(', ')}`);
+            summaryItems.push(`🥗 Diet: ${labels.join(', ')}`);
         }
         
         // SECTION 3: NUTRITION
         const nutritionItems = [];
         if (profile.max_calories) nutritionItems.push(`Calories ≤ ${profile.max_calories}`);
-        if (profile.min_protein) nutritionItems.push(`Protéines ≥ ${profile.min_protein}g`);
-        if (profile.max_carbs) nutritionItems.push(`Glucides ≤ ${profile.max_carbs}g`);
-        if (profile.max_fat) nutritionItems.push(`Lipides ≤ ${profile.max_fat}g`);
+        if (profile.min_protein) nutritionItems.push(`Proteins ≥ ${profile.min_protein}g`);
+        if (profile.max_carbs) nutritionItems.push(`Carbohydrates ≤ ${profile.max_carbs}g`);
+        if (profile.max_fat) nutritionItems.push(`Lipids ≤ ${profile.max_fat}g`);
         if (nutritionItems.length > 0) {
             summaryItems.push(`🔥 Nutrition: ${nutritionItems.join(', ')}`);
         }
         
         // SECTION 4: PRÉFÉRENCES
         if (profile.disliked_ingredients && profile.disliked_ingredients.length > 0) {
-            summaryItems.push(`👎 Évite: ${profile.disliked_ingredients.slice(0, 3).join(', ')}${profile.disliked_ingredients.length > 3 ? '...' : ''}`);
+            summaryItems.push(`👎 Avoid: ${profile.disliked_ingredients.slice(0, 3).join(', ')}${profile.disliked_ingredients.length > 3 ? '...' : ''}`);
         }
         
         if (profile.max_prep_time) {
-            summaryItems.push(`⏱️ Temps max: ${profile.max_prep_time} min`);
+            summaryItems.push(`⏱️ Time max: ${profile.max_prep_time} min`);
         }
         
         if (summaryItems.length > 0) {
@@ -608,7 +608,7 @@ class SaveEatApp {
                 document.getElementById('ingredientsContainer').innerHTML = `
                     <div class="text-center w-full py-8">
                         <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mb-4"></div>
-                        <p class="font-medium text-gray-700">Chargement des ingrédients...</p>
+                        <p class="font-medium text-gray-700">Loading ingredients...</p>
                         <p class="text-sm text-gray-500 mt-2">${data.message || 'Première initialisation en cours'}</p>
                     </div>
                 `;
@@ -618,8 +618,8 @@ class SaveEatApp {
                 console.warn('No ingredients found');
                 document.getElementById('ingredientsContainer').innerHTML = `
                     <div class="text-center w-full py-4 text-gray-500">
-                        <p class="font-medium">Aucun ingrédient disponible</p>
-                        <p class="text-sm">Rechargez la page ou vérifiez la base de données</p>
+                        <p class="font-medium">No ingredients available</p>
+                        <p class="text-sm">Refresh page</p>
                     </div>
                 `;
             }
@@ -627,10 +627,10 @@ class SaveEatApp {
             console.error('Error loading ingredients:', error);
             document.getElementById('ingredientsContainer').innerHTML = `
                 <div class="text-center w-full py-4 text-red-500">
-                    <p class="font-medium">Erreur de chargement</p>
+                    <p class="font-medium">Error loading</p>
                     <p class="text-sm">${error.message}</p>
                     <button onclick="location.reload()" class="mt-4 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">
-                        Recharger la page
+                        Refresh page
                     </button>
                 </div>
             `;
@@ -646,7 +646,7 @@ class SaveEatApp {
         if (!list || list.length === 0) {
             container.innerHTML = `
                 <div class="w-full text-center text-sm text-gray-500 py-2">
-                    Aucun ingrédient ne correspond à votre recherche
+                    No ingredients match with your search
                 </div>
             `;
             return;
@@ -1121,14 +1121,14 @@ class SaveEatApp {
                 // Update UI to show profile is active
                 this.updateProfileIndicator();
                 
-                alert('✅ Profil enregistré avec succès ! Vos préférences seront appliquées aux recommandations.');
+                alert('✅ Profil saved successfully.');
                 this.closeProfileModal();
             } else {
-                alert('❌ Erreur lors de l\'enregistrement du profil');
+                alert('❌ Error saving your profil');
             }
         } catch (error) {
             console.error('Error saving profile:', error);
-            alert('❌ Erreur: ' + error.message);
+            alert('❌ Error: ' + error.message);
         }
     }
 
@@ -1189,7 +1189,7 @@ class SaveEatApp {
     }
 
     async deleteProfile() {
-        if (!confirm('⚠️ Êtes-vous sûr de vouloir supprimer votre profil alimentaire ?')) {
+        if (!confirm('⚠️ Are you sure deleting your profile ?')) {
             return;
         }
 
@@ -1202,15 +1202,15 @@ class SaveEatApp {
                 this.updateProfileIndicator(false);
                 this.updateProfileSummary(null);
                 
-                alert('✅ Profil supprimé avec succès');
+                alert('✅ Profil deleted successfully');
                 this.clearProfileForm();
                 this.closeProfileModal();
             } else {
-                alert('❌ Erreur lors de la suppression');
+                alert('❌ Error with deleting');
             }
         } catch (error) {
             console.error('Error deleting profile:', error);
-            alert('❌ Erreur: ' + error.message);
+            alert('❌ Error: ' + error.message);
         }
     }
 
@@ -1286,7 +1286,7 @@ class SaveEatApp {
         } catch (error) {
             console.error('Error loading popular recipes:', error);
             document.getElementById('loadingState').classList.add('hidden');
-            alert(`❌ Erreur: ${error.message}`);
+            alert(`❌ Error: ${error.message}`);
         }
     }
     
@@ -1334,7 +1334,7 @@ class SaveEatApp {
                     ${this.renderStars(avg_rating)}
                 </div>
                 <span class="text-sm font-semibold text-gray-700">${avg_rating.toFixed(1)}</span>
-                <span class="text-xs text-gray-500">(${review_count} avis)</span>
+                <span class="text-xs text-gray-500">(${review_count} reviews)</span>
             </div>
         ` : '';
         
@@ -1343,7 +1343,7 @@ class SaveEatApp {
         const validReviews = reviews ? reviews.filter(r => r.rating !== null && r.rating !== undefined) : [];
         const reviewsHTML = validReviews && validReviews.length > 0 ? `
             <div class="mt-3 border-t pt-3">
-                <h4 class="text-sm font-semibold text-gray-700 mb-2">💬 Avis récents</h4>
+                <h4 class="text-sm font-semibold text-gray-700 mb-2">💬 No reviews</h4>
                 <div class="space-y-2 max-h-48 overflow-y-auto">
                     ${validReviews.slice(0, 4).map(review => {
                         const rating = review.rating !== null && review.rating !== undefined ? review.rating : 0;
@@ -1356,7 +1356,7 @@ class SaveEatApp {
                                 </div>
                                 <span class="text-xs text-gray-500">User ${review.user_id}</span>
                             </div>
-                            ${reviewText ? `<p class="text-xs text-gray-700 line-clamp-2">${reviewText}</p>` : '<p class="text-xs text-gray-400 italic">Aucun commentaire</p>'}
+                            ${reviewText ? `<p class="text-xs text-gray-700 line-clamp-2">${reviewText}</p>` : '<p class="text-xs text-gray-400 italic">No reviews</p>'}
                         </div>
                     `;
                     }).join('')}
@@ -1391,7 +1391,7 @@ class SaveEatApp {
                     <!-- Header -->
                     <div class="flex items-start justify-between mb-3">
                         <h3 class="text-lg font-bold text-gray-900 line-clamp-2 flex-1">
-                            ${name || 'Recette sans titre'}
+                            ${name || 'Recipe without title'}
                         </h3>
                     </div>
                     
@@ -1423,7 +1423,7 @@ class SaveEatApp {
                         </div>
                         ${n_ingredients ? `
                             <span class="text-xs font-medium text-gray-500">
-                                ${n_ingredients} ingrédients
+                                ${n_ingredients} ingredients
                             </span>
                         ` : ''}
                     </div>
@@ -1437,7 +1437,7 @@ class SaveEatApp {
                     <!-- Actions -->
                     <button onclick="app.viewRecipe(${recipe_id})" 
                             class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-all transform hover:scale-[1.02] mt-3">
-                        Voir la recette
+                        See the recipe
                     </button>
                 </div>
             </div>
@@ -1471,7 +1471,7 @@ class SaveEatApp {
 
     async searchRecipes() {
         if (this.selectedIngredients.size === 0) {
-            alert('⚠️ Veuillez sélectionner au moins un ingrédient');
+            alert('⚠️ You must add one ingredients at least');
             return;
         }
 
@@ -1661,7 +1661,7 @@ class SaveEatApp {
                     <!-- Header -->
                     <div class="flex items-start justify-between mb-3">
                         <h3 class="text-lg font-bold text-gray-900 line-clamp-2 flex-1">
-                            ${name || 'Recette sans titre'}
+                            ${name || 'Recipe without title'}
                         </h3>
                         <div class="${matchColor} text-white px-2 py-1 rounded-lg text-xs font-bold ml-2">
                             ${matchPercent}%
@@ -1693,7 +1693,7 @@ class SaveEatApp {
                         </div>
                         ${n_ingredients ? `
                             <span class="text-xs font-medium text-gray-500">
-                                ${n_ingredients} ingrédients
+                                ${n_ingredients} ingredients
                             </span>
                         ` : ''}
                     </div>
@@ -1718,7 +1718,7 @@ class SaveEatApp {
                     <!-- Actions -->
                     <button onclick="app.viewRecipe(${recipe_id})" 
                             class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-all transform hover:scale-[1.02]">
-                        Voir la recette
+                        See the recipe
                     </button>
                 </div>
             </div>
@@ -1744,15 +1744,15 @@ class SaveEatApp {
         }
         if (protein) {
             const percent = Math.min((protein / dailyValues.protein) * 100, 100);
-            items.push({ label: 'Protéines', value: Math.round(protein), percent, color: 'bg-blue-500' });
+            items.push({ label: 'proteins', value: Math.round(protein), percent, color: 'bg-blue-500' });
         }
         if (carbs) {
             const percent = Math.min((carbs / dailyValues.carbs) * 100, 100);
-            items.push({ label: 'Glucides', value: Math.round(carbs), percent, color: 'bg-yellow-500' });
+            items.push({ label: 'Carbohydrates', value: Math.round(carbs), percent, color: 'bg-yellow-500' });
         }
         if (fat) {
             const percent = Math.min((fat / dailyValues.fat) * 100, 100);
-            items.push({ label: 'Lipides', value: Math.round(fat), percent, color: 'bg-purple-500' });
+            items.push({ label: 'Lipids', value: Math.round(fat), percent, color: 'bg-purple-500' });
         }
 
         return `
@@ -1823,7 +1823,7 @@ class SaveEatApp {
 
         const ingredientsHTML = ingredients_list && ingredients_list.length > 0 ?
             ingredients_list.map(ing => `<li class="flex items-start"><span class="text-green-500 mr-2">•</span> ${this.capitalize(ing)}</li>`).join('') :
-            '<li class="text-gray-500">Aucun ingrédient disponible</li>';
+            '<li class="text-gray-500">No ingredients available</li>';
 
         const stepsHTML = steps_list && steps_list.length > 0 ?
             steps_list.map((step, idx) => `
@@ -1834,7 +1834,7 @@ class SaveEatApp {
                     <p class="text-gray-700 flex-1 pt-1">${step}</p>
                 </div>
             `).join('') :
-            '<p class="text-gray-500">Aucune instruction disponible</p>';
+            '<p class="text-gray-500">No instructions available</p>';
 
         return `
             <div id="recipeModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
@@ -1854,7 +1854,7 @@ class SaveEatApp {
 
                     <!-- Content -->
                     <div class="p-8">
-                        <h2 class="text-3xl font-bold text-gray-900 mb-2">${name || 'Recette'}</h2>
+                        <h2 class="text-3xl font-bold text-gray-900 mb-2">${name || 'Recipe'}</h2>
                         ${description ? `<p class="text-gray-600 mb-4">${description}</p>` : ''}
 
                         <!-- Stats -->
@@ -1875,14 +1875,14 @@ class SaveEatApp {
                                     <span class="font-semibold">${Math.round(calories)} cal</span>
                                 </div>
                             ` : ''}
-                            ${protein ? `<span class="text-sm text-gray-600">Protéines: ${Math.round(protein)}g</span>` : ''}
-                            ${carbohydrates ? `<span class="text-sm text-gray-600">Glucides: ${Math.round(carbohydrates)}g</span>` : ''}
-                            ${total_fat ? `<span class="text-sm text-gray-600">Lipides: ${Math.round(total_fat)}g</span>` : ''}
+                            ${protein ? `<span class="text-sm text-gray-600">Proteins: ${Math.round(protein)}g</span>` : ''}
+                            ${carbohydrates ? `<span class="text-sm text-gray-600">Carbohydrates: ${Math.round(carbohydrates)}g</span>` : ''}
+                            ${total_fat ? `<span class="text-sm text-gray-600">Lipids: ${Math.round(total_fat)}g</span>` : ''}
                         </div>
 
                         <!-- Ingredients -->
                         <div class="mb-6">
-                            <h3 class="text-xl font-bold text-gray-900 mb-3">🥕 Ingrédients</h3>
+                            <h3 class="text-xl font-bold text-gray-900 mb-3">🥕 Ingredients</h3>
                             <ul class="space-y-2 text-gray-700">${ingredientsHTML}</ul>
                         </div>
 

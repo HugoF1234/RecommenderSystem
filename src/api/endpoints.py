@@ -1478,29 +1478,29 @@ async def _get_fallback_recommendations(request: RecommendationRequest) -> Recom
 
                 if has_all:
                     explanations.append(
-                        f"✅ Vous avez TOUS les ingrédients nécessaires ({used}/{recipe_total}) : {name}"
+                        f"✅ You have all the ingredients ({used}/{recipe_total}) : {name}"
                     )
                 elif missing_count > 0:
                     if len(missing_ings) > 0:
                         missing_display = ", ".join(missing_ings[:3])
                         if len(missing_ings) > 3:
-                            missing_display += f" (+{len(missing_ings) - 3} autres)"
+                            missing_display += f" (+{len(missing_ings) - 3} others)"
                         explanations.append(
-                            f"⚠️ Il manque {missing_count} ingrédient(s) "
-                            f"({used}/{recipe_total} disponibles) : {name}. "
-                            f"Manquent : {missing_display}"
+                            f"⚠️ Missing {missing_count}"
+                            f"({used}/{recipe_total} availables) : {name}. "
+                            f"Missing : {missing_display}"
                         )
                     else:
                         explanations.append(
-                            f"⚠️ Il manque {missing_count} ingrédient(s) "
-                            f"({used}/{recipe_total} disponibles, {match_pct}%) : {name}"
+                            f"⚠️ Missing {missing_count}"
+                            f"({used}/{recipe_total} availables, {match_pct}%) : {name}"
                         )
                 else:
                     explanations.append(
-                        f"Utilise {used}/{recipe_total} ingrédients ({match_pct}% de la recette) : {name}"
+                        f"Use {used}/{recipe_total} ingredients ({match_pct}% of the recipe) : {name}"
                     )
             else:
-                explanations.append(f"Recette populaire : {name}")
+                explanations.append(f"Famous recipe : {name}")
 
         return RecommendationResponse(
             recipe_ids=recipe_ids,
