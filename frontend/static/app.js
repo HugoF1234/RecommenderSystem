@@ -1782,11 +1782,21 @@ class SaveEatApp {
             document.body.insertAdjacentHTML('beforeend', modal);
 
             // Add close listener
-            document.getElementById('recipeModal').addEventListener('click', (e) => {
-                if (e.target.id === 'recipeModal' || e.target.id === 'closeModal') {
-                    document.getElementById('recipeModal').remove();
+            const modalEl = document.getElementById('recipeModal');
+
+            modalEl.addEventListener('click', (e) => {
+                // Clic sur le fond (backdrop)
+                if (e.target.id === 'recipeModal') {
+                    modalEl.remove();
+                    return;
+                }
+
+                // Clic sur la croix ou n'importe quel enfant de ce bouton (svg, path, etc.)
+                if (e.target.closest('#closeModal')) {
+                    modalEl.remove();
                 }
             });
+
 
             // Log interaction
             await fetch('/api/v1/log_interaction', {
