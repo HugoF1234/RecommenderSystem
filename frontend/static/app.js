@@ -1,11 +1,28 @@
 // Save Eat - Modern Frontend JavaScript
 // Handles all user interactions and API calls
+//
+// This is the main frontend logic for Save Eat. It manages:
+// - User authentication (simple local storage based system)
+// - User profile management (dietary restrictions, allergies, etc.)
+// - Ingredient selection with visual shelf display
+// - Recipe search and recommendations via our GNN-powered API
+// - Dynamic UI updates and animations
+//
+// The frontend is designed to be simple and intuitive while integrating
+// with our sophisticated backend recommendation system.
 
 // ============================================================================
-// USER MANAGER - Gestion de l'authentification simple
+// USER MANAGER - Simple authentication management
 // ============================================================================
 
 class UserManager {
+    /**
+     * Manages user authentication and session
+     *
+     * We use localStorage for simplicity - in production this would be
+     * replaced with proper OAuth/JWT authentication. For our demo,
+     * we just need to track user IDs for personalized recommendations.
+     */
     constructor() {
         this.currentUserId = null;
         this.currentUsername = null;
@@ -13,7 +30,7 @@ class UserManager {
     }
 
     init() {
-        // Charger l'utilisateur depuis localStorage
+        // Load user from localStorage if they've visited before
         const savedUserId = localStorage.getItem('saveeat_user_id');
         const savedUsername = localStorage.getItem('saveeat_username');
 
@@ -86,15 +103,23 @@ class UserManager {
 // ============================================================================
 
 class UserProfileManager {
+    /**
+     * Manages user dietary profiles and preferences
+     *
+     * This class handles all interactions with our profile API endpoints.
+     * User profiles store important information like allergies, dietary
+     * restrictions, and nutrition goals that our recommendation system
+     * uses to filter recipes appropriately.
+     */
     constructor() {
         this.currentProfile = null;
         this.apiBaseUrl = '/api/v1';
     }
 
     /**
-     * Charge le profil utilisateur depuis l'API
-     * @param {number} userId - ID de l'utilisateur
-     * @returns {Promise<Object|null>} Le profil ou null si non trouvé
+     * Load user profile from API
+     * @param {number} userId - User ID
+     * @returns {Promise<Object|null>} Profile object or null if not found
      */
     async loadProfile(userId) {
         try {
@@ -241,12 +266,23 @@ class UserProfileManager {
 // ============================================================================
 
 class SaveEatApp {
+    /**
+     * Main application class for Save Eat
+     *
+     * This is the heart of our frontend. It coordinates all the different
+     * components and handles the ingredient selection UI, which features
+     * a unique "shelf" visualization where selected ingredients are displayed
+     * as if they're sitting on kitchen shelves.
+     *
+     * The app communicates with our GNN-powered backend to get personalized
+     * recipe recommendations based on available ingredients and user preferences.
+     */
     constructor() {
         this.selectedIngredients = new Set();
         this.selectedDietaryPrefs = new Set();
         this.ingredients = [];
         this.filteredIngredients = [];
-        // Stockage des positions fixes de chaque ingrédient
+        // Store fixed positions for each ingredient on the shelf display
         this.ingredientPositions = new Map(); // Map<ingredient, {x, y, shelf}>
         // Configuration des zones d'étagères (en % du haut du conteneur)
         // Calculées automatiquement pour 6 étagères équidistantes

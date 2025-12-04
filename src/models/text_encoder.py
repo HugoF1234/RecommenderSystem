@@ -88,7 +88,8 @@ class TextEncoder(nn.Module):
             outputs = self.model(**encoded)
             
             # Use attention-weighted pooling instead of mean pooling for better performance
-            # Attention weights based on token importance
+            # This approach gives more weight to important tokens (like "chocolate" or "grilled")
+            # and less weight to stop words, resulting in better semantic representations
             attention_mask = encoded.get("attention_mask", None)
             if attention_mask is not None:
                 # Weighted mean with attention mask

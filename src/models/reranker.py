@@ -17,6 +17,15 @@ logger = logging.getLogger(__name__)
 class ContextualReranker(nn.Module):
     """
     Re-ranks recommendations using contextual features
+
+    This module takes the base GNN recommendations and adjusts them based on
+    real-world constraints like:
+    - Available ingredients in the user's kitchen
+    - Time constraints (e.g., "I need dinner in 30 minutes")
+    - Dietary preferences and restrictions
+
+    Think of it as a second-stage filter that personalizes recommendations
+    beyond just collaborative filtering.
     """
     
     def __init__(

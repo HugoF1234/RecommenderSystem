@@ -19,6 +19,19 @@ class GraphBuilder:
     """
     Builds heterogeneous graphs for recipe recommendation
     Creates graphs with user, recipe, and ingredient nodes
+
+    This class constructs the graph structure that our GNN operates on.
+    We use a heterogeneous graph with three node types:
+    - Users: people who rate recipes
+    - Recipes: dishes with ingredients and instructions
+    - Ingredients: individual food items (optional, but helps with cold start)
+
+    Edges represent:
+    - User-Recipe: ratings/interactions
+    - Recipe-Ingredient: what ingredients are in each recipe
+
+    The graph structure allows the model to learn that if you like pasta carbonara,
+    you might also like other pasta dishes or other recipes with eggs and cheese.
     """
     
     def __init__(self, embedding_dim: int = 128):

@@ -81,6 +81,16 @@ class InteractionDataset(Dataset):
 class Trainer:
     """
     Trainer for HybridGNN model
+
+    Handles the training loop, validation, checkpointing, and early stopping.
+    The training process uses negative sampling to teach the model to distinguish
+    between recipes a user would like vs dislike.
+
+    Key features:
+    - AdamW optimizer with weight decay for regularization
+    - Learning rate scheduling to adjust learning rate when validation plateaus
+    - Early stopping to prevent overfitting
+    - Checkpoint saving to resume training or deploy best model
     """
     
     def __init__(
@@ -108,6 +118,8 @@ class Trainer:
         self.device = device
         
         # Optimizer with better settings for GNN training
+        # AdamW is Adam with decoupled weight decay - works better for deep networks
+        # Weight decay helps prevent overfitting by penalizing large weights
         self.optimizer = optim.AdamW(
             model.parameters(),
             lr=config.get("learning_rate", 0.001),
@@ -128,6 +140,8 @@ class Trainer:
             self.scheduler = None
         
         # Loss function (BCE with logits) - can be extended to BPR loss for ranking
+        # BCEWithLogitsLoss combines sigmoid + binary cross entropy for numerical stability
+        # We treat recommendation as binary classification: will user like this recipe?
         self.criterion = nn.BCEWithLogitsLoss()
         
         # Dataset and dataloader

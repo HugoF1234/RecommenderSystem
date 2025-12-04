@@ -20,6 +20,16 @@ class DataPreprocessor:
     """
     Preprocesses raw data for model training
     Filters users and recipes, creates features, and splits data
+
+    This class handles the messy work of cleaning and transforming raw Food.com
+    data into a format suitable for training our GNN model. Key responsibilities:
+    - Filter out users/recipes with too few interactions (cold start problem)
+    - Parse ingredients from various formats (R-style lists, JSON, etc.)
+    - Extract nutritional info and cooking steps
+    - Create train/val/test splits
+    - Generate ID mappings for the graph
+
+    The goal is to create consistent, clean data regardless of the input format.
     """
     
     def __init__(
@@ -95,7 +105,13 @@ class DataPreprocessor:
         recipes = recipes.copy()
         
         def safe_parse_ingredients(x):
-            """Safely parse ingredients from various formats"""
+            """
+            Safely parse ingredients from various formats
+
+            The Food.com dataset uses R-style lists (c("ing1", "ing2")), but we also
+            support JSON arrays and plain text. This function tries multiple parsing
+            strategies to handle different data sources gracefully.
+            """
             if pd.isna(x) or x == "":
                 return []
             

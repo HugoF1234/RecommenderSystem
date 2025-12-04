@@ -1,6 +1,18 @@
 """
 Database module for Save Eat
 Manages PostgreSQL/SQLite database for interactions
+
+This module provides a unified interface to our database, supporting both
+SQLite (for development/demo) and PostgreSQL (for production deployment).
+
+It defines SQLAlchemy models for:
+- Recipes: core recipe data with nutritional info
+- Reviews: user ratings and reviews for collaborative filtering
+- UserProfile: dietary preferences and restrictions for personalized filtering
+- Interactions: logging user behavior for model improvement
+
+The database layer is designed to be flexible and work seamlessly with both
+local development and cloud deployment scenarios.
 """
 
 from sqlalchemy import create_engine, Column, Integer, Float, String, DateTime, Text, JSON, func, desc, nullslast
@@ -19,6 +31,10 @@ Base = declarative_base()
 class Recipe(Base):
     """
     Recipe table for storing recipe data
+
+    Stores comprehensive recipe information including ingredients, steps,
+    nutritional values, and metadata. This is the core data that our GNN
+    model uses to make recommendations.
     """
     __tablename__ = "recipes"
     
@@ -68,6 +84,11 @@ class Review(Base):
 class UserProfile(Base):
     """
     User profile table for storing user preferences and information
+
+    Profiles allow users to save their dietary restrictions, allergies,
+    and nutritional goals. Our recommendation system uses this data to
+    filter out unsuitable recipes automatically, ensuring safe and
+    personalized recommendations.
     """
     __tablename__ = "user_profiles"
 

@@ -76,14 +76,17 @@ class HybridGNN(nn.Module):
         
         # GNN layers for heterogeneous graph
         self.convs = nn.ModuleList()
-        
+
         # First layer: input_dim -> hidden_dim
-        # Using GAT (Graph Attention Networks) for better performance than SAGE
-        # GAT learns attention weights over neighbors, capturing more complex patterns
-        # This is a state-of-the-art approach for recommendation systems
+        # We chose GAT (Graph Attention Networks) over simpler approaches like GraphSAGE
+        # because it learns attention weights over neighbors, which helps the model focus
+        # on the most relevant interactions. This is particularly useful for recommendation
+        # where not all user-recipe interactions are equally important
         if num_layers > 0:
             # Use GAT with multi-head attention for richer representations
-            # When concat=True, output_dim = heads * out_channels
+            # Multi-head attention is inspired by Transformers - each head can learn
+            # different aspects of the relationships between nodes
+            # With concat=True, output_dim = heads * out_channels (4 heads * 64 = 256)
             gat_heads = 4
             gat_out_dim = hidden_dim // gat_heads  # Each head produces hidden_dim/heads features
             
@@ -99,7 +102,8 @@ class HybridGNN(nn.Module):
             )
             
             # Middle layers: hidden_dim -> hidden_dim
-            # Using GAT with attention for better feature learning
+            # Stack multiple GAT layers to capture higher-order relationships
+            # Each layer aggregates information from further neighbors in the graph
             for _ in range(num_layers - 1):
                 self.convs.append(
                     HeteroConv({
@@ -113,6 +117,7 @@ class HybridGNN(nn.Module):
                 )
         
         # Final projection to embedding_dim with LayerNorm for better training stability
+        # LayerNorm helps prevent gradient explosion/vanishing, which is common in deep GNNs
         if num_layers > 0:
             self.user_projection = nn.Sequential(
                 nn.Linear(hidden_dim, embedding_dim),

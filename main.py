@@ -1,6 +1,16 @@
 """
 Main entry point for Save Eat project
 Provides CLI interface for common tasks
+
+This module serves as the primary command-line interface for the Save Eat
+recommendation system. It handles:
+- Dataset downloading and preprocessing
+- Database initialization (SQLite/PostgreSQL)
+- Model training workflows
+- API server startup
+
+The CLI is designed to simplify common operations and provide a consistent
+interface for both development and production deployments.
 """
 
 import argparse
@@ -8,11 +18,17 @@ import sys
 from pathlib import Path
 
 def main():
-    """Main entry point"""
+    """
+    Main entry point for the CLI
+
+    Sets up argument parsing for all available commands and routes execution
+    to the appropriate handlers. Each command is designed to be independent
+    and can be run without requiring other commands to have been executed first.
+    """
     parser = argparse.ArgumentParser(description="Save Eat - Recipe Recommendation System")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
-    
-    # Preprocess command
+
+    # Preprocess command - transforms raw CSV data into model-ready format
     preprocess_parser = subparsers.add_parser("preprocess", help="Preprocess the dataset")
     preprocess_parser.add_argument("--data-path", type=str, default="data/raw", help="Path to raw data")
     preprocess_parser.add_argument("--output-path", type=str, default="data/processed", help="Path to save processed data")
@@ -44,8 +60,10 @@ def main():
     
     if args.command == "preprocess":
         print("Preprocessing dataset...")
-        
+
         # Try to load from database first (if available)
+        # This allows us to skip CSV parsing if data is already in the database,
+        # which is much faster for large datasets
         db_path = Path("data/saveeat.db")
         if db_path.exists():
             print(f"✅ Found database at {db_path}")

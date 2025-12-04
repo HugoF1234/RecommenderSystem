@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -104,7 +104,7 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                         </svg>
-                        <span class="font-medium">Mon Profil</span>
+                        <span class="font-medium">My Profile</span>
                     </button>
                 </div>
             </div>
@@ -120,7 +120,7 @@
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                     </svg>
-                    <h2 class="text-2xl font-bold">Mon Profil Alimentaire</h2>
+                    <h2 class="text-2xl font-bold">My Dietary Profile</h2>
                 </div>
                 <button id="closeProfileModal" class="hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition-all">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -134,8 +134,8 @@
 
                 <!-- User Info -->
                 <div class="bg-gray-50 rounded-lg p-4">
-                    <p class="text-sm text-gray-600">Connecté en tant que</p>
-                    <p id="profileUsername" class="text-xl font-semibold text-gray-900">Utilisateur</p>
+                    <p class="text-sm text-gray-600">Logged in as</p>
+                    <p id="profileUsername" class="text-xl font-semibold text-gray-900">User</p>
                     <p id="profileUserId" class="text-sm text-gray-500">ID: ---</p>
                 </div>
 
@@ -145,55 +145,55 @@
                         <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
-                        <h3 class="text-lg font-semibold text-green-800">Profil actif</h3>
+                        <h3 class="text-lg font-semibold text-green-800">Active Profile</h3>
                     </div>
                     <div id="profileSummaryContent" class="text-sm text-green-700 space-y-1">
                         <!-- Summary will be populated by JavaScript -->
                     </div>
-                    <p class="text-xs text-green-600 mt-2">Ces préférences sont appliquées automatiquement à vos recommandations</p>
+                    <p class="text-xs text-green-600 mt-2">These preferences are automatically applied to your recommendations</p>
                 </div>
 
                 <!-- SECTION 1: SÉCURITÉ -->
                 <div class="border-l-4 border-red-500 pl-4">
                     <label class="block text-lg font-semibold text-gray-900 mb-3">
-                        🚨 Allergies <span class="text-red-500 text-sm">(obligatoire si applicable)</span>
+                        🚨 Allergies <span class="text-red-500 text-sm">(required if applicable)</span>
                     </label>
-                    <input type="text" id="profileAllergies" list="allergiesList" placeholder="Tapez pour voir les suggestions (ex: gluten, dairy, nuts)"
+                    <input type="text" id="profileAllergies" list="allergiesList" placeholder="Type to see suggestions (e.g., gluten, dairy, nuts)"
                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent">
                     <datalist id="allergiesList">
                         <!-- Options will be populated by JavaScript -->
                     </datalist>
-                    <p class="text-xs text-gray-500 mt-1">⚠️ Ces ingrédients seront <strong>strictement exclus</strong> de vos recettes pour votre sécurité</p>
+                    <p class="text-xs text-gray-500 mt-1">⚠️ These ingredients will be <strong>strictly excluded</strong> from your recipes for your safety</p>
                 </div>
 
                 <!-- SECTION 2: RÉGIME ALIMENTAIRE -->
                 <div class="border-l-4 border-green-500 pl-4">
                     <label class="block text-lg font-semibold text-gray-900 mb-3">
-                        🥗 Régime alimentaire
+                        🥗 Dietary Restrictions
                     </label>
                     <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
                         <label class="flex items-center space-x-2 cursor-pointer p-2 rounded-lg hover:bg-green-50 transition-colors">
                             <input type="checkbox" class="dietary-checkbox" value="none" id="dietary-none" class="w-4 h-4 text-green-500 rounded">
-                            <span class="text-sm font-medium">Aucun</span>
+                            <span class="text-sm font-medium">None</span>
                         </label>
                         <label class="flex items-center space-x-2 cursor-pointer p-2 rounded-lg hover:bg-green-50 transition-colors">
                             <input type="checkbox" class="dietary-checkbox" value="vegetarian" class="w-4 h-4 text-green-500 rounded">
-                            <span class="text-sm font-medium">Végétarien</span>
+                            <span class="text-sm font-medium">Vegetarian</span>
                         </label>
                         <label class="flex items-center space-x-2 cursor-pointer p-2 rounded-lg hover:bg-green-50 transition-colors">
                             <input type="checkbox" class="dietary-checkbox" value="vegan" class="w-4 h-4 text-green-500 rounded">
-                            <span class="text-sm font-medium">Végan</span>
+                            <span class="text-sm font-medium">Vegan</span>
                         </label>
                         <label class="flex items-center space-x-2 cursor-pointer p-2 rounded-lg hover:bg-green-50 transition-colors">
                             <input type="checkbox" class="dietary-checkbox" value="gluten-free" class="w-4 h-4 text-green-500 rounded">
-                            <span class="text-sm font-medium">Sans gluten</span>
+                            <span class="text-sm font-medium">Gluten-free</span>
                         </label>
                         <label class="flex items-center space-x-2 cursor-pointer p-2 rounded-lg hover:bg-green-50 transition-colors">
                             <input type="checkbox" class="dietary-checkbox" value="dairy-free" class="w-4 h-4 text-green-500 rounded">
-                            <span class="text-sm font-medium">Sans lactose</span>
+                            <span class="text-sm font-medium">Dairy-free</span>
                         </label>
                     </div>
-                    <p class="text-xs text-gray-500 mt-2">Les recettes contenant des ingrédients interdits seront exclues</p>
+                    <p class="text-xs text-gray-500 mt-2">Recipes containing forbidden ingredients will be excluded</p>
                 </div>
 
                 <!-- SECTION 3: NUTRITION -->
@@ -204,56 +204,56 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                Calories maximum par recette
+                                Maximum calories per recipe
                             </label>
                             <input type="number" id="profileMaxCalories" placeholder="Ex: 600" min="0"
                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                💪 Protéines minimum (g)
+                                💪 Minimum protein (g)
                             </label>
                             <input type="number" id="profileMinProtein" placeholder="Ex: 20" min="0"
                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                🍞 Glucides maximum (g)
+                                🍞 Maximum carbs (g)
                             </label>
                             <input type="number" id="profileMaxCarbs" placeholder="Ex: 50" min="0"
                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                🥑 Lipides maximum (g)
+                                🥑 Maximum fat (g)
                             </label>
                             <input type="number" id="profileMaxFat" placeholder="Ex: 30" min="0"
                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                         </div>
                     </div>
-                    <p class="text-xs text-gray-500 mt-2">Les recettes ne respectant pas ces contraintes seront exclues</p>
+                    <p class="text-xs text-gray-500 mt-2">Recipes not meeting these constraints will be excluded</p>
                 </div>
 
                 <!-- SECTION 4: PRÉFÉRENCES -->
                 <div class="border-l-4 border-purple-500 pl-4">
                     <label class="block text-lg font-semibold text-gray-900 mb-3">
-                        👎 Ingrédients à éviter
+                        👎 Ingredients to Avoid
                     </label>
-                    <input type="text" id="profileDisliked" list="dislikedList" placeholder="Tapez pour voir les suggestions (ex: mushrooms, olives, anchovies)"
+                    <input type="text" id="profileDisliked" list="dislikedList" placeholder="Type to see suggestions (e.g., mushrooms, olives, anchovies)"
                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
                     <datalist id="dislikedList">
                         <!-- Options will be populated by JavaScript -->
                     </datalist>
-                    <p class="text-xs text-gray-500 mt-1">Les recettes contenant ces ingrédients seront exclues</p>
+                    <p class="text-xs text-gray-500 mt-1">Recipes containing these ingredients will be excluded</p>
                 </div>
 
                 <div class="border-l-4 border-purple-500 pl-4">
                     <label class="block text-lg font-semibold text-gray-900 mb-3">
-                        ⏱️ Temps de préparation maximum
+                        ⏱️ Maximum Preparation Time
                     </label>
                     <input type="number" id="profileMaxPrepTime" placeholder="Ex: 30" min="0"
                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                    <p class="text-xs text-gray-500 mt-1">Les recettes nécessitant plus de temps seront exclues (en minutes)</p>
+                    <p class="text-xs text-gray-500 mt-1">Recipes requiring more time will be excluded (in minutes)</p>
                 </div>
 
             </div>
@@ -261,14 +261,14 @@
             <!-- Modal Footer -->
             <div class="sticky bottom-0 bg-gray-50 px-6 py-4 flex items-center justify-between rounded-b-2xl border-t">
                 <button id="deleteProfileButton" class="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-all">
-                    Supprimer le profil
+                    Delete Profile
                 </button>
                 <div class="flex space-x-3">
                     <button id="cancelProfileButton" class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all">
-                        Annuler
+                        Cancel
                     </button>
                     <button id="saveProfileButton" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all shadow-md">
-                        Enregistrer
+                        Save
                     </button>
                 </div>
             </div>
@@ -282,11 +282,11 @@
         <div class="bg-gradient-to-r from-green-50 to-blue-50 rounded-2xl shadow-lg p-6 mb-6 border border-green-200">
             <div class="flex items-center justify-between">
                 <div>
-                    <h2 class="text-2xl font-bold text-gray-900 mb-2">🛒 Je vais faire les courses</h2>
-                    <p class="text-gray-600">Découvrez les recettes les mieux notées avec leurs avis</p>
+                    <h2 class="text-2xl font-bold text-gray-900 mb-2">🛒 I'm Going Shopping</h2>
+                    <p class="text-gray-600">Discover the highest-rated recipes with their reviews</p>
                 </div>
                 <button id="shoppingBtn" class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md transition-all transform hover:scale-105">
-                    Voir les recettes populaires
+                    See Popular Recipes
                 </button>
             </div>
         </div>
@@ -295,9 +295,9 @@
         <div class="bg-white rounded-2xl shadow-xl p-6 mb-10 border border-sky-100">
             <!-- Titles Row -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6 items-center mb-0">
-                <h2 class="text-2xl font-bold text-slate-900 md:col-span-3 text-center mb-0">🔍 Trouvez votre recette idéale</h2>
+                <h2 class="text-2xl font-bold text-slate-900 md:col-span-3 text-center mb-0">🔍 Find Your Perfect Recipe</h2>
                 <p class="text-lg font-semibold text-slate-800 text-center md:col-span-1">
-                    Mes réserves
+                    My Pantry
                 </p>
             </div>
             
@@ -306,14 +306,14 @@
                 <!-- Left: all ingredients + search -->
                 <div class="md:col-span-3 flex flex-col justify-center">
                     <label class="block text-sm font-semibold text-slate-800 mb-3">
-                        Ingrédients disponibles
+                        Available Ingredients
                     </label>
                     <!-- Ingredient Search -->
                     <div class="mb-3">
                         <input 
                             type="text" 
                             id="ingredientSearch" 
-                            placeholder="Rechercher un ingrédient (ex : tomate, poulet, pâtes…)" 
+                            placeholder="Search for an ingredient (e.g., tomato, chicken, pasta...)" 
                             class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent placeholder-slate-400 text-sm"
                         >
                     </div>
@@ -325,7 +325,7 @@
                 <!-- Right: selected ingredients highlight -->
                 <div class="md:col-span-1 flex flex-col items-stretch">
                     <div id="selectedIngredientsContainer" class="relative min-h-[300px] bg-white border border-slate-200 rounded-lg overflow-hidden">
-                        <img src="/static/etagere.png" alt="Étagère" class="w-full h-full object-contain">
+                        <img src="/static/etagere.png" alt="Shelf" class="w-full h-full object-contain">
                         <div id="ingredientsOverlay" class="absolute inset-0">
                         </div>
                     </div>
@@ -337,7 +337,7 @@
                 <!-- Max Time -->
                 <div>
                     <label class="block text-sm font-semibold text-slate-800 mb-2">
-                        ⏱️ Temps maximum (minutes)
+                        ⏱️ Maximum Time (minutes)
                     </label>
                     <input type="number" id="maxTime" placeholder="Ex: 30" 
                            class="w-full px-4 py-3 border border-slate-300 bg-white text-slate-900 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent placeholder-slate-400">
@@ -346,7 +346,7 @@
                 <!-- Max Calories -->
                 <div>
                     <label class="block text-sm font-semibold text-slate-800 mb-2">
-                        🔥 Calories max
+                        🔥 Max Calories
                     </label>
                     <input type="number" id="maxCalories" placeholder="Ex: 500" 
                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
@@ -355,7 +355,7 @@
                 <!-- Number of results -->
                 <div>
                     <label class="block text-sm font-semibold text-slate-800 mb-2">
-                        📊 Nombre de résultats
+                        📊 Number of Results
                     </label>
                     <input type="number" id="topK" value="10" min="5" max="50"
                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
@@ -365,20 +365,20 @@
             <!-- Dietary Preferences -->
             <div class="mb-6">
                 <label class="block text-sm font-semibold text-slate-800 mb-3">
-                    🥗 Préférences alimentaires
+                    🥗 Dietary Preferences
                 </label>
                 <div class="flex flex-wrap gap-3">
                     <button data-pref="vegetarian" class="dietary-btn px-4 py-2 rounded-full border-2 border-slate-200 text-slate-800 hover:border-emerald-400 hover:bg-emerald-50 transition-all">
-                        🌱 Végétarien
+                        🌱 Vegetarian
                     </button>
                     <button data-pref="vegan" class="dietary-btn px-4 py-2 rounded-full border-2 border-slate-200 text-slate-800 hover:border-emerald-400 hover:bg-emerald-50 transition-all">
-                        🥬 Végan
+                        🥬 Vegan
                     </button>
                     <button data-pref="gluten-free" class="dietary-btn px-4 py-2 rounded-full border-2 border-slate-200 text-slate-800 hover:border-emerald-400 hover:bg-emerald-50 transition-all">
-                        🌾 Sans gluten
+                        🌾 Gluten-free
                     </button>
                     <button data-pref="dairy-free" class="dietary-btn px-4 py-2 rounded-full border-2 border-slate-200 text-slate-800 hover:border-emerald-400 hover:bg-emerald-50 transition-all">
-                        🥛 Sans lactose
+                        🥛 Dairy-free
                     </button>
                 </div>
             </div>
@@ -389,7 +389,7 @@
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                     </svg>
-                    Chercher des Recettes
+                    Search Recipes
                 </span>
             </button>
         </div>
@@ -398,7 +398,7 @@
         <div id="resultsSection" class="hidden">
             <div class="flex items-center justify-between mb-6">
                 <h2 class="text-2xl font-bold text-gray-900">
-                    <span id="resultsCount">0</span> recettes trouvées
+                    <span id="resultsCount">0</span> recipes found
                 </h2>
                 <div class="flex items-center space-x-2 text-sm text-gray-500">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -415,8 +415,8 @@
         <!-- Loading State -->
         <div id="loadingState" class="hidden text-center py-12">
             <div class="loading-spinner mx-auto mb-4"></div>
-            <p class="text-gray-600 font-medium">Recherche des meilleures recettes...</p>
-            <p class="text-sm text-gray-500 mt-2">Le GNN analyse vos préférences...</p>
+            <p class="text-gray-600 font-medium">Searching for the best recipes...</p>
+            <p class="text-sm text-gray-500 mt-2">The GNN is analyzing your preferences...</p>
         </div>
 
         <!-- Empty State -->
@@ -424,8 +424,8 @@
             <svg class="w-24 h-24 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
-            <h3 class="text-xl font-semibold text-gray-700 mb-2">Aucune recette trouvée</h3>
-            <p class="text-gray-500">Essayez avec moins de filtres ou d'autres ingrédients</p>
+            <h3 class="text-xl font-semibold text-gray-700 mb-2">No Recipes Found</h3>
+            <p class="text-gray-500">Try with fewer filters or different ingredients</p>
         </div>
     </main>
 
@@ -433,20 +433,20 @@
     <footer class="bg-white mt-16 py-8 border-t">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <p class="text-gray-600">
-                <span class="font-semibold">Save Eat</span> - Projet RecSys Startup Sprint
+                <span class="font-semibold">Save Eat</span> - RecSys Startup Sprint Project
             </p>
             <p class="text-sm text-gray-500 mt-2">
                 Team: Victor Lestrade, Matthieu Houette, Hugo Fouan, Basile Sorrel, Wadih Ben Abdesselem
             </p>
             <p class="text-xs text-gray-400 mt-2">
-                94,496 recettes • 1,401,982 reviews
+                94,496 recipes • 1,401,982 reviews
             </p>
         </div>
     </footer>
 
     <script src="/static/app.js"></script>
     <script>
-        // Background aléatoire - un fond choisi au hasard au chargement
+        // Random background - a random background chosen on load
         const backgrounds = [
             '/static/fond/fond4.png',
             '/static/fond/fond5.png',
@@ -459,11 +459,11 @@
         
         const slideshowElement = document.getElementById('backgroundSlideshow');
         
-        // Choisir un fond au hasard
+        // Choose a random background
         const randomIndex = Math.floor(Math.random() * backgrounds.length);
         const selectedBackground = backgrounds[randomIndex];
         
-        // Afficher le fond choisi
+        // Display the chosen background
         slideshowElement.style.backgroundImage = `url('${selectedBackground}')`;
         slideshowElement.style.opacity = '1';
 
