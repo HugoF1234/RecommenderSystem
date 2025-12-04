@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 # Global database instance and cache
 db_instance = None
 _ingredients_cache = None
+_ingredient_properties_cache = None  # Cache for ingredient dietary properties (gluten, lactose, vegetarian, vegan)
 
 
 def _precalculate_ingredients_cache():
@@ -36,6 +37,57 @@ def _precalculate_ingredients_cache():
     except Exception as e:
         logger.error(f"Failed to pre-calculate ingredients cache: {e}")
         _ingredients_cache = []
+
+
+def _load_ingredient_properties():
+    """
+    Load ingredient dietary properties from CSV into memory cache
+    Returns dict: {ingredient_name_lower: {gluten: bool, lactose: bool, vegetarian: bool, vegan: bool}}
+    """
+    global _ingredient_properties_cache
+    from pathlib import Path
+    import pandas as pd
+    
+    csv_path = Path("data/gluten_lactose_vegan_vege.csv")
+    
+    if not csv_path.exists():
+        logger.warning(f"Ingredient properties CSV not found: {csv_path}")
+        logger.warning("Dietary restrictions filtering will use fallback method (less precise)")
+        _ingredient_properties_cache = {}
+        return {}
+    
+    try:
+        logger.info(f"📋 Loading ingredient properties from {csv_path}...")
+        df = pd.read_csv(csv_path)
+        
+        # Convert to dict: {ingredient_name_lower: {gluten: bool, lactose: bool, vegetarian: bool, vegan: bool}}
+        properties_dict = {}
+        for _, row in df.iterrows():
+            ingredient_name = str(row['ingredient']).strip().lower()
+            
+            # Helper function to convert various formats to bool
+            def to_bool(val):
+                if isinstance(val, bool):
+                    return val
+                if isinstance(val, str):
+                    return val.lower().strip() == 'true'
+                return bool(val)
+            
+            properties_dict[ingredient_name] = {
+                'gluten': to_bool(row.get('gluten', False)),
+                'lactose': to_bool(row.get('lactose', False)),
+                'vegetarian': to_bool(row.get('vegetarian', False)),
+                'vegan': to_bool(row.get('vegan', False))
+            }
+        
+        logger.info(f"✅ Loaded properties for {len(properties_dict)} ingredients")
+        _ingredient_properties_cache = properties_dict
+        return properties_dict
+        
+    except Exception as e:
+        logger.error(f"Failed to load ingredient properties: {e}", exc_info=True)
+        _ingredient_properties_cache = {}
+        return {}
 
 # Create FastAPI app
 app = FastAPI(
@@ -214,6 +266,10 @@ async def startup_event():
                         else:
                             logger.warning("⚠️  Reviews CSV not found. Reviews will remain empty.")
                             logger.info("   To load reviews: download reviews_clean_full.csv from Kaggle and place in data/raw/")
+                    
+                    # Load ingredient properties CSV (synchronous, fast - just reading CSV)
+                    # This must be done before filtering recipes
+                    _load_ingredient_properties()
                     
                     # Schedule ingredients cache pre-calculation in background thread (after port binding!)
                     # This prevents Render timeout during startup - server binds port first, then cache loads

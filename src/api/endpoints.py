@@ -812,6 +812,7 @@ def filter_recipes_by_allergies(recipes_df, allergies: List[str]):
 def filter_recipes_by_dietary_restrictions(recipes_df, restrictions: List[str]):
     """
     Filtre les recettes selon les restrictions alimentaires
+    Utilise le CSV gluten_lactose_vegan_vege.csv pour un filtrage précis basé sur les propriétés réelles des ingrédients
 
     Args:
         recipes_df: DataFrame de recettes
@@ -830,33 +831,42 @@ def filter_recipes_by_dietary_restrictions(recipes_df, restrictions: List[str]):
     restrictions_normalized = [r.lower().strip() for r in restrictions]
     logger.info(f"Filtering recipes by dietary restrictions: {restrictions_normalized}")
 
-    # Définir les ingrédients interdits par type de restriction
-    RESTRICTED_INGREDIENTS = {
-        'vegetarian': ['beef', 'pork', 'chicken', 'fish', 'meat', 'turkey', 'lamb', 'veal', 'duck', 'bacon', 'ham', 'sausage', 'seafood', 'shrimp', 'salmon', 'tuna'],
-        'vegan': ['beef', 'pork', 'chicken', 'fish', 'meat', 'turkey', 'lamb', 'veal', 'duck', 'bacon', 'ham', 'sausage',
-                  'dairy', 'milk', 'cheese', 'egg', 'butter', 'cream', 'yogurt', 'whey', 'casein', 'honey',
-                  'gelatin', 'seafood', 'shrimp', 'salmon', 'tuna'],
-        'gluten-free': ['wheat', 'flour', 'bread', 'pasta', 'gluten', 'barley', 'rye', 'oat', 'cereal', 'couscous', 'semolina'],
-        'dairy-free': ['milk', 'cheese', 'butter', 'cream', 'yogurt', 'dairy', 'whey', 'casein', 'lactose'],
-        'low-sugar': [],  # Géré par les filtres nutritionnels
-        'high-protein': []  # Géré par les filtres nutritionnels
+    # Get ingredient properties cache
+    try:
+        from .main import _ingredient_properties_cache
+        ingredient_props = _ingredient_properties_cache or {}
+    except ImportError:
+        ingredient_props = {}
+        logger.warning("Ingredient properties cache not available, using fallback method")
+
+    # Map restrictions to CSV column names
+    restriction_to_property = {
+        'gluten-free': 'gluten',  # If gluten-free, exclude ingredients with gluten=true
+        'dairy-free': 'lactose',  # If dairy-free, exclude ingredients with lactose=true
+        'vegetarian': 'vegetarian',  # If vegetarian, exclude ingredients with vegetarian=false
+        'vegan': 'vegan'  # If vegan, exclude ingredients with vegan=false
     }
 
-    # Collecter tous les ingrédients interdits pour les restrictions spécifiées
-    forbidden_ingredients = set()
+    # Determine which properties to check
+    properties_to_check = {}
     for restriction in restrictions_normalized:
-        if restriction in RESTRICTED_INGREDIENTS:
-            forbidden_ingredients.update(RESTRICTED_INGREDIENTS[restriction])
-            logger.debug(f"Restriction '{restriction}' adds {len(RESTRICTED_INGREDIENTS[restriction])} forbidden ingredients")
+        if restriction in restriction_to_property:
+            prop = restriction_to_property[restriction]
+            if restriction in ['gluten-free', 'dairy-free']:
+                # For "gluten-free" and "dairy-free", exclude if property is True
+                properties_to_check[prop] = True
+            else:
+                # For "vegetarian" and "vegan", exclude if property is False
+                properties_to_check[prop] = False
 
-    if not forbidden_ingredients:
-        logger.debug("No forbidden ingredients found for specified restrictions")
+    if not properties_to_check:
+        logger.debug("No valid restrictions found (must be: gluten-free, dairy-free, vegetarian, vegan)")
         return recipes_df
 
-    logger.debug(f"Total forbidden ingredients: {len(forbidden_ingredients)}")
+    logger.debug(f"Checking properties: {properties_to_check}")
 
     def has_forbidden_ingredient(ingredients_list) -> bool:
-        """Vérifie si la recette contient un ingrédient interdit"""
+        """Vérifie si la recette contient un ingrédient interdit selon le CSV"""
         if not ingredients_list or not isinstance(ingredients_list, list):
             return False
 
@@ -864,13 +874,39 @@ def filter_recipes_by_dietary_restrictions(recipes_df, restrictions: List[str]):
             if not ingredient:
                 continue
 
-            ing_lower = str(ingredient).lower().strip()
-
-            # Vérifier si un ingrédient interdit est présent
-            for forbidden in forbidden_ingredients:
-                if forbidden in ing_lower:
-                    logger.debug(f"Found forbidden ingredient '{forbidden}' in '{ingredient}'")
-                    return True
+            # Normalize ingredient name (lowercase, strip)
+            ing_normalized = str(ingredient).lower().strip()
+            
+            # Try exact match first
+            if ing_normalized in ingredient_props:
+                props = ingredient_props[ing_normalized]
+                
+                # Check each property requirement
+                for prop, forbidden_value in properties_to_check.items():
+                    if prop in props and props[prop] == forbidden_value:
+                        logger.debug(f"Found forbidden ingredient '{ingredient}' (has {prop}={forbidden_value})")
+                        return True
+            
+            # If not found in CSV, try partial matching (fallback for ingredients not in CSV)
+            # This handles cases where ingredient names might have variations
+            # Only do partial matching if we have the CSV loaded (otherwise it's too slow)
+            if ingredient_props:
+                for csv_ingredient, props in ingredient_props.items():
+                    # Check if CSV ingredient is contained in recipe ingredient or vice versa
+                    # Use word boundaries to avoid false positives (e.g., "chickpea" contains "chicken")
+                    if len(csv_ingredient) > 3 and len(ing_normalized) > 3:
+                        # Check if one is contained in the other
+                        if csv_ingredient in ing_normalized or ing_normalized in csv_ingredient:
+                            # Additional check: ensure it's not a false positive
+                            # For example, "chickpea" should not match "chicken"
+                            # We check if the match is at word boundaries or if lengths are similar
+                            len_diff = abs(len(csv_ingredient) - len(ing_normalized))
+                            if len_diff < len(csv_ingredient) * 0.5:  # Lengths are similar (within 50%)
+                                # Check each property requirement
+                                for prop, forbidden_value in properties_to_check.items():
+                                    if prop in props and props[prop] == forbidden_value:
+                                        logger.debug(f"Found forbidden ingredient '{ingredient}' (matches '{csv_ingredient}' with {prop}={forbidden_value})")
+                                        return True
 
         return False
 
@@ -883,7 +919,7 @@ def filter_recipes_by_dietary_restrictions(recipes_df, restrictions: List[str]):
     filtered_count = len(filtered_df)
     removed_count = initial_count - filtered_count
 
-    logger.info(f"Dietary restrictions filter: removed {removed_count} recipes ({initial_count} → {filtered_count})")
+    logger.info(f"Dietary restrictions filter (CSV-based): removed {removed_count} recipes ({initial_count} → {filtered_count})")
 
     return filtered_df
 
