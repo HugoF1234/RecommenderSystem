@@ -248,15 +248,14 @@ class SaveEatApp {
         this.filteredIngredients = [];
         // Stockage des positions fixes de chaque ingrédient
         this.ingredientPositions = new Map(); // Map<ingredient, {x, y, shelf}>
-        // Configuration des zones d'étagères (en %)
-        this.shelfZones = [
-            { top: 3, bottom: 18, left: 5, right: 5 }, // Étagère 1
-            { top: 20, bottom: 35, left: 5, right: 5 }, // Étagère 2
-            { top: 37, bottom: 52, left: 5, right: 5 }, // Étagère 3
-            { top: 54, bottom: 69, left: 5, right: 5 }, // Étagère 4
-            { top: 71, bottom: 86, left: 5, right: 5 }, // Étagère 5
-            { top: 88, bottom: 97, left: 5, right: 5 }  // Étagère 6
-        ];
+        // Configuration des zones d'étagères (en % du haut du conteneur)
+        // Calculées automatiquement pour 6 étagères équidistantes
+        this.numShelves = 6;
+        this.shelfMarginLeft = 3; // Marge gauche en %
+        this.shelfMarginRight = 3; // Marge droite en %
+        
+        // Zones calibrées sauvegardées
+        this.calibratedZones = null; // Zones calibrées sauvegardées
 
         // Initialize user management
         this.userManager = new UserManager();
@@ -279,11 +278,25 @@ class SaveEatApp {
         await this.loadIngredients();
         this.setupEventListeners();
         
-        // Charger la calibration sauvegardée si elle existe
+        // Charger les zones calibrées si elles existent
+        this.loadCalibratedZones();
+    }
+    
+    loadCalibratedZones() {
         const saved = localStorage.getItem('shelfZones');
         if (saved) {
             try {
-                this.shelfZones = JSON.parse(saved);
+                const zones = JSON.parse(saved);
+                if (zones && zones.length === this.numShelves) {
+                    // Utiliser les zones calibrées avec les marges ajustées (3% à gauche et droite)
+                    this.calibratedZones = zones.map(zone => ({
+                        top: zone.top,
+                        bottom: zone.bottom,
+                        left: 3, // Marge gauche fixe à 3%
+                        right: 3  // Marge droite fixe à 3%
+                    }));
+                    console.log('✅ Zones calibrées chargées depuis localStorage (marges: 3% gauche/droite)');
+                }
             } catch (e) {
                 console.warn('Erreur lors du chargement de la calibration:', e);
             }
@@ -481,9 +494,13 @@ class SaveEatApp {
 
     renderSelectedIngredients() {
         const overlay = document.getElementById('ingredientsOverlay');
-        if (!overlay) return;
+        if (!overlay) {
+            console.error('❌ ingredientsOverlay not found');
+            return;
+        }
 
         const selected = Array.from(this.selectedIngredients);
+        console.log(`📦 Rendering ${selected.length} selected ingredients`);
 
         if (selected.length === 0) {
             overlay.innerHTML = '';
@@ -493,28 +510,61 @@ class SaveEatApp {
 
         // Attendre que le conteneur soit rendu pour avoir ses dimensions
         setTimeout(() => {
-            const containerWidth = overlay.offsetWidth || 300;
-            const containerHeight = overlay.offsetHeight || 300;
+            const container = document.getElementById('selectedIngredientsContainer');
+            if (!container) {
+                console.error('❌ selectedIngredientsContainer not found');
+                return;
+            }
             
-            // Configuration : 6 zones rouges (étagères)
-            const numShelves = 6;
+            const containerWidth = container.offsetWidth;
+            const containerHeight = container.offsetHeight;
+            
+            if (containerWidth === 0 || containerHeight === 0) {
+                console.warn('⚠️ Container has zero dimensions, retrying...');
+                setTimeout(() => this.renderSelectedIngredients(), 100);
+                return;
+            }
+            
+            console.log(`📐 Container dimensions: ${containerWidth}x${containerHeight}`);
+            
+            // Configuration des chips
             const chipWidth = 65; // Largeur réduite en px
             const chipHeight = 20; // Hauteur réduite en px
-            const chipSpacing = 0; // Pas d'espacement entre les chips empilés
+            const chipSpacing = 2; // Espacement vertical entre les chips empilés
             
-            // Utiliser les zones calibrées
-            const shelfZones = this.shelfZones.map(zone => ({
-                top: zone.top,
-                bottom: zone.bottom,
-                height: zone.bottom - zone.top,
-                left: zone.left,
-                right: zone.right
-            }));
+            // Utiliser les zones calibrées si disponibles, sinon calculer automatiquement
+            let shelfZones;
+            if (this.calibratedZones && this.calibratedZones.length === this.numShelves) {
+                console.log('✅ Using calibrated zones:', this.calibratedZones);
+                shelfZones = this.calibratedZones.map(zone => ({
+                    top: zone.top,
+                    bottom: zone.bottom,
+                    height: zone.bottom - zone.top,
+                    left: zone.left || this.shelfMarginLeft,
+                    right: zone.right || this.shelfMarginRight
+                }));
+            } else {
+                console.log('📊 Using auto-calculated zones');
+                // Calculer automatiquement les zones d'étagères (6 étagères équidistantes)
+                const shelfHeightPercent = 100 / this.numShelves; // Hauteur de chaque étagère en %
+                shelfZones = [];
+                for (let i = 0; i < this.numShelves; i++) {
+                    const top = (i * shelfHeightPercent) + 2; // +2% pour éviter le bord supérieur
+                    const bottom = ((i + 1) * shelfHeightPercent) - 2; // -2% pour éviter le bord inférieur
+                    shelfZones.push({
+                        top: top,
+                        bottom: bottom,
+                        height: bottom - top,
+                        left: this.shelfMarginLeft,
+                        right: this.shelfMarginRight
+                    });
+                }
+            }
             
             // Pour chaque ingrédient, utiliser sa position existante ou en créer une nouvelle
             const placedItems = [];
             // Structure pour suivre les positions occupées par étagère : {x, width, y, stackHeight}
-            const shelfOccupancy = Array(numShelves).fill(0).map(() => []);
+            const shelfOccupancy = Array(shelfZones.length).fill(0).map(() => []);
             
             // D'abord, reconstruire les positions existantes dans shelfOccupancy
             const chipHeightPercent = (chipHeight / containerHeight) * 100;
@@ -561,18 +611,20 @@ class SaveEatApp {
                 });
             });
 
-            // Générer le HTML avec positions absolues (gravité : bottom de l'étagère)
+            // Générer le HTML avec positions absolues
+            console.log(`🎯 Placing ${placedItems.length} items on shelves`);
             overlay.innerHTML = placedItems.map(item => {
                 const zone = shelfZones[item.shelf];
                 // item.y est le TOP de l'ingrédient en % depuis le haut
-                // Pour le bottom CSS, on doit calculer : bottom = 100 - (top + hauteur)
-                const chipHeightPercent = (chipHeight / containerHeight) * 100;
-                const bottomPercent = 100 - (item.y + chipHeightPercent);
+                // Convertir en pixels pour le positionnement CSS
+                const topPx = (item.y / 100) * containerHeight;
+                
+                console.log(`  - ${item.ingredient}: shelf ${item.shelf}, x=${item.x}px, y=${item.y}% (${topPx}px from top)`);
                 
                 return `
                 <button 
                     data-ingredient="${item.ingredient}"
-                    style="position: absolute; left: ${item.x}px; bottom: ${bottomPercent}%; width: ${chipWidth}px; height: ${chipHeight}px;"
+                    style="position: absolute; left: ${item.x}px; top: ${topPx}px; width: ${chipWidth}px; height: ${chipHeight}px;"
                     class="flex items-center justify-center gap-0.5 rounded-full bg-emerald-100 text-emerald-900 text-[9px] font-medium border border-emerald-300 hover:bg-emerald-200 transition-all shadow-sm z-10 pointer-events-auto">
                     <span class="truncate px-1 text-[9px]">${this.capitalize(item.ingredient)}</span>
                     <span class="text-emerald-700 text-[9px] font-bold flex-shrink-0">×</span>
@@ -601,7 +653,7 @@ class SaveEatApp {
         const chipHeightPercent = (chipHeight / containerHeight) * 100;
         const spacingPercent = (chipSpacing / containerHeight) * 100;
         
-        // Créer une liste d'étagères dans un ordre aléatoire
+        // Créer une liste d'étagères dans un ordre aléatoire pour distribuer les ingrédients
         const shelfOrder = Array.from({length: numShelves}, (_, i) => i);
         // Mélanger l'ordre
         for (let i = shelfOrder.length - 1; i > 0; i--) {
@@ -614,24 +666,23 @@ class SaveEatApp {
             const zone = shelfZones[shelfIndex];
             const leftMargin = containerWidth * (zone.left / 100);
             const rightMargin = containerWidth * (zone.right / 100);
-            const minX = leftMargin;
-            const maxX = containerWidth - rightMargin - chipWidth;
+            const minX = Math.max(0, leftMargin);
+            const maxX = Math.min(containerWidth - chipWidth, containerWidth - rightMargin - chipWidth);
             const occupied = shelfOccupancy[shelfIndex];
             
-            // ÉTAPE 1 : Essayer de placer au bottom sans chevauchement
-            const bottomY = zone.bottom - chipHeightPercent;
+            // Calculer la position Y au bas de l'étagère (en % depuis le haut)
+            const bottomYPercent = zone.bottom - chipHeightPercent;
             
-            // Essayer plusieurs positions X aléatoires au bottom
-            for (let attempt = 0; attempt < 50; attempt++) {
-                const testX = minX + Math.random() * (maxX - minX - chipWidth);
+            // ÉTAPE 1 : Essayer de placer au bottom de l'étagère sans chevauchement
+            for (let attempt = 0; attempt < 30; attempt++) {
+                const testX = minX + Math.random() * Math.max(0, maxX - minX);
                 const testXEnd = testX + chipWidth;
                 
-                // Vérifier qu'il n'y a pas de chevauchement avec les ingrédients existants
+                // Vérifier qu'il n'y a pas de chevauchement
                 let canPlace = true;
                 for (const occ of occupied) {
-                    // Vérifier chevauchement horizontal ET vertical
                     const horizontalOverlap = !(testXEnd <= occ.x || testX >= occ.x + occ.width);
-                    const verticalOverlap = !(bottomY + chipHeightPercent <= occ.y || bottomY >= occ.y + (occ.height || chipHeightPercent));
+                    const verticalOverlap = !(bottomYPercent + chipHeightPercent <= occ.y || bottomYPercent >= occ.y + (occ.height || chipHeightPercent));
                     
                     if (horizontalOverlap && verticalOverlap) {
                         canPlace = false;
@@ -639,54 +690,49 @@ class SaveEatApp {
                     }
                 }
                 
-                if (canPlace && bottomY >= zone.top) {
-                    // Enregistrer la position occupée
+                if (canPlace && bottomYPercent >= zone.top) {
                     occupied.push({
                         x: testX,
                         width: chipWidth,
-                        y: bottomY,
+                        y: bottomYPercent,
                         height: chipHeightPercent
                     });
                     
                     return {
                         x: testX,
-                        y: bottomY,
+                        y: bottomYPercent,
                         shelf: shelfIndex
                     };
                 }
             }
             
-            // ÉTAPE 2 : Si pas de place au bottom, essayer d'empiler au-dessus
-            for (let attempt = 0; attempt < 50; attempt++) {
-                const testX = minX + Math.random() * (maxX - minX - chipWidth);
+            // ÉTAPE 2 : Si pas de place au bottom, essayer d'empiler au-dessus des ingrédients existants
+            for (let attempt = 0; attempt < 30; attempt++) {
+                const testX = minX + Math.random() * Math.max(0, maxX - minX);
                 const testXEnd = testX + chipWidth;
                 
-                // Trouver tous les ingrédients qui chevauchent horizontalement à cette position X
+                // Trouver les ingrédients qui chevauchent horizontalement
                 const overlappingItems = occupied.filter(occ => 
                     !(testXEnd <= occ.x || testX >= occ.x + occ.width)
                 );
                 
                 if (overlappingItems.length > 0) {
-                    // Trouver l'item le plus haut (y le plus petit) pour empiler au-dessus
+                    // Trouver l'item le plus haut pour empiler au-dessus
                     const topmostItem = overlappingItems.reduce((min, item) => 
                         item.y < min.y ? item : min
                     );
                     
-                    // Empiler au-dessus : position Y = position du plus haut item - hauteur (sans espacement)
-                    const y = topmostItem.y - chipHeightPercent;
+                    // Empiler au-dessus avec espacement
+                    const y = topmostItem.y - chipHeightPercent - spacingPercent;
                     
-                    // Vérifier qu'on reste dans la zone et qu'on ne chevauche pas d'autres items
+                    // Vérifier qu'on reste dans la zone
                     if (y >= zone.top) {
-                        // Vérifier qu'on ne chevauche pas d'autres items à cette position
-                        // L'espacement est déjà pris en compte dans le calcul de y, donc on vérifie normalement
+                        // Vérifier qu'on ne chevauche pas d'autres items
                         let canStack = true;
                         for (const occ of occupied) {
                             if (occ === topmostItem) continue;
                             
                             const horizontalOverlap = !(testXEnd <= occ.x || testX >= occ.x + occ.width);
-                            // Vérifier qu'il n'y a pas de chevauchement vertical
-                            // Le bottom du nouvel item (y + chipHeightPercent) doit être <= top de l'item existant (occ.y)
-                            // OU le top du nouvel item (y) doit être >= bottom de l'item existant (occ.y + occ.height)
                             const verticalOverlap = !(y + chipHeightPercent <= occ.y || y >= occ.y + (occ.height || chipHeightPercent));
                             
                             if (horizontalOverlap && verticalOverlap) {
@@ -696,7 +742,6 @@ class SaveEatApp {
                         }
                         
                         if (canStack) {
-                            // Enregistrer la position occupée
                             occupied.push({
                                 x: testX,
                                 width: chipWidth,
@@ -715,19 +760,19 @@ class SaveEatApp {
             }
         }
         
-        // Si aucune place dans aucune étagère, forcer dans la première avec chevauchement
+        // Si aucune place trouvée, placer dans la première étagère disponible (même avec chevauchement)
         const firstShelf = shelfOrder[0];
         const zone = shelfZones[firstShelf];
         const leftMargin = containerWidth * (zone.left / 100);
         const rightMargin = containerWidth * (zone.right / 100);
-        const maxX = containerWidth - rightMargin - chipWidth;
-        const minX = leftMargin;
-        const randomX = minX + Math.random() * (maxX - minX - chipWidth);
+        const maxX = Math.min(containerWidth - chipWidth, containerWidth - rightMargin - chipWidth);
+        const minX = Math.max(0, leftMargin);
+        const randomX = minX + Math.random() * Math.max(0, maxX - minX);
         const y = zone.bottom - chipHeightPercent;
         
         const position = {
             x: Math.max(minX, Math.min(randomX, maxX)),
-            y: y,
+            y: Math.max(zone.top, y),
             shelf: firstShelf
         };
         
