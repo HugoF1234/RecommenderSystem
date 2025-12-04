@@ -49,30 +49,15 @@ def ensure_database_ready():
             print(f"✅ Database ready: {recipe_count} recipes, {review_count} reviews")
             return True
     
-    # Database missing or empty - load data
-    print("📦 First time setup - loading data...")
-    print("   This will take 2-3 minutes...")
-    
-    db = Database(database_type="sqlite", sqlite_path=str(db_path))
-    
-    # Load recipes
-    recipes_csv = Path("data/processed/recipes.csv")
-    if recipes_csv.exists():
-        print("   Loading recipes...")
-        db.load_recipes_from_csv(str(recipes_csv))
-    else:
-        print("   ⚠️  Warning: data/processed/recipes.csv not found")
-        print("   Run: python main.py preprocess")
-        return False
-    
-    # Load reviews (optional, takes time)
-    reviews_csv = Path("data/raw/reviews.csv")
-    if reviews_csv.exists():
-        print("   Loading reviews (this takes ~2 minutes)...")
-        db.load_reviews_from_csv(str(reviews_csv))
-    
-    print("✅ Database initialized!")
-    return True
+    # Database missing or empty - check if we can extract from compressed file
+    # If compressed DB exists, it will be extracted by startup_event in src/api/main.py
+    # If not, the preprocessing will handle loading data from CSV if available
+    print("📦 Database is empty or missing")
+    print("   The system will attempt to:")
+    print("   1. Extract database from data/saveeat.db.gz (if available)")
+    print("   2. Generate processed files automatically from database")
+    print("   This will happen during API startup...")
+    return True  # Allow startup to continue - preprocessing will handle data loading
 
 # Run server when executed directly
 if __name__ == "__main__":

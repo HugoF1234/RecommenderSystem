@@ -168,6 +168,58 @@ async def startup_event():
                 recipe_data_path.exists()
             )
             
+            if not essential_files_exist:
+                # Auto-generate processed files from database (for seamless 5-step setup)
+                logger.info("📦 Essential processed files not found. Auto-generating from database...")
+                logger.info("   This will take 2-3 minutes on first run...")
+                
+                try:
+                    # Check if database has data
+                    session = db_instance.get_session()
+                    from .database import Recipe, Review
+                    recipe_count = session.query(Recipe).count()
+                    review_count = session.query(Review).count()
+                    session.close()
+                    
+                    if recipe_count > 0:
+                        logger.info(f"   Found {recipe_count} recipes and {review_count} reviews in database")
+                        logger.info("   Running preprocessing pipeline...")
+                        
+                        # Import preprocessing function
+                        from src.data.db_to_processed import preprocess_from_db
+                        import os
+                        
+                        # Determine database type and path
+                        db_type = "sqlite"
+                        db_path_str = "data/saveeat.db"
+                        if os.getenv("DATABASE_URL"):
+                            db_type = "postgresql"
+                            db_path_str = os.getenv("DATABASE_URL")
+                        
+                        # Run preprocessing
+                        processed_data, graph_data = preprocess_from_db(
+                            db_path=db_path_str,
+                            database_type=db_type,
+                            output_path=Path("data/processed")
+                        )
+                        
+                        logger.info("✅ Preprocessing complete!")
+                        logger.info(f"   - {processed_data['stats']['n_users']} users")
+                        logger.info(f"   - {processed_data['stats']['n_recipes']} recipes")
+                        logger.info(f"   - Graph: {graph_data.num_nodes} nodes, {graph_data.num_edges} edges")
+                        
+                        # Files should now exist, continue to model initialization
+                        essential_files_exist = True
+                    else:
+                        logger.warning("⚠️  Database is empty. Cannot generate processed files.")
+                        logger.warning("   Please ensure database has data (recipes and reviews)")
+                        logger.warning("   API will run but recommendations will use fallback method")
+                except Exception as e:
+                    logger.error(f"❌ Failed to auto-generate processed files: {e}")
+                    logger.error("   API will run but recommendations will use fallback method")
+                    import traceback
+                    logger.debug(traceback.format_exc())
+            
             if essential_files_exist:
                 # Initialize model (will use checkpoint if available, otherwise random weights)
                 initialize_model(
@@ -188,7 +240,6 @@ async def startup_event():
                 logger.warning("⚠️  Model cannot be loaded - missing essential files:")
                 for file in missing_files:
                     logger.warning(f"   - {file}")
-                logger.warning("   Run: python main.py preprocess")
                 logger.warning("   API will run but recommendations will use fallback method")
         else:
             logger.warning("Config file not found, using defaults")
