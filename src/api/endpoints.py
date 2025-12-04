@@ -883,9 +883,22 @@ def filter_recipes_by_dietary_restrictions(recipes_df, restrictions: List[str]):
                 
                 # Check each property requirement
                 for prop, forbidden_value in properties_to_check.items():
-                    if prop in props and props[prop] == forbidden_value:
-                        logger.debug(f"Found forbidden ingredient '{ingredient}' (has {prop}={forbidden_value})")
+                    if prop not in props:
+                        continue
+
+                    prop_val = props[prop]
+
+                    # Normalisation pour gérer bool / texte / majuscules, etc.
+                    prop_norm = str(prop_val).strip().lower()
+                    forbidden_norm = str(forbidden_value).strip().lower()
+
+                    if prop_norm == forbidden_norm:
+                        logger.debug(
+                            f"Found forbidden ingredient '{ingredient}' "
+                            f"(has {prop}={prop_val}, forbidden={forbidden_value})"
+                        )
                         return True
+
             
             # If not found in CSV, try partial matching (fallback for ingredients not in CSV)
             # This handles cases where ingredient names might have variations
@@ -904,8 +917,18 @@ def filter_recipes_by_dietary_restrictions(recipes_df, restrictions: List[str]):
                             if len_diff < len(csv_ingredient) * 0.5:  # Lengths are similar (within 50%)
                                 # Check each property requirement
                                 for prop, forbidden_value in properties_to_check.items():
-                                    if prop in props and props[prop] == forbidden_value:
-                                        logger.debug(f"Found forbidden ingredient '{ingredient}' (matches '{csv_ingredient}' with {prop}={forbidden_value})")
+                                    if prop not in props:
+                                        continue
+
+                                    prop_val = props[prop]
+                                    prop_norm = str(prop_val).strip().lower()
+                                    forbidden_norm = str(forbidden_value).strip().lower()
+
+                                    if prop_norm == forbidden_norm:
+                                        logger.debug(
+                                            f"Found forbidden ingredient '{ingredient}' "
+                                            f"(matches '{csv_ingredient}' with {prop}={prop_val}, forbidden={forbidden_value})"
+                                        )
                                         return True
 
         return False
