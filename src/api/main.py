@@ -103,6 +103,23 @@ async def startup_event():
                 except Exception as e:
                     logger.error(f"❌ Failed to extract database: {e}")
             
+            # IMPORTANT: Auto-extract reviews CSV if needed (for fresh deployments)
+            reviews_csv_path = Path("data/raw/reviews_clean_full.csv")
+            reviews_csv_gz_path = Path("data/raw/reviews_clean_full.csv.gz")
+            if reviews_csv_gz_path.exists() and not reviews_csv_path.exists():
+                import gzip
+                import shutil
+                logger.info("📦 Extracting reviews CSV from archive...")
+                try:
+                    # Ensure directory exists
+                    reviews_csv_path.parent.mkdir(parents=True, exist_ok=True)
+                    with gzip.open(reviews_csv_gz_path, 'rb') as f_in:
+                        with open(reviews_csv_path, 'wb') as f_out:
+                            shutil.copyfileobj(f_in, f_out)
+                    logger.info("✅ Reviews CSV extracted successfully!")
+                except Exception as e:
+                    logger.error(f"❌ Failed to extract reviews CSV: {e}")
+            
             # Priority: Use PostgreSQL if DATABASE_URL is set (regardless of config.yaml)
             if os.getenv("DATABASE_URL"):
                 try:
@@ -132,16 +149,71 @@ async def startup_event():
                 )
             logger.info("Database initialized")
             
-            # Check if database has recipes
+            # Check if database has recipes and reviews
             session = db_instance.get_session()
             try:
-                from .database import Recipe
+                from .database import Recipe, Review
                 recipe_count = session.query(Recipe).count()
+                review_count = session.query(Review).count()
+                
+                # Check if reviews exist but are empty (all have rating=None and review=None)
+                reviews_with_content = session.query(Review).filter(
+                    (Review.rating.isnot(None)) | (Review.review.isnot(None))
+                ).count()
+                
                 if recipe_count == 0:
                     logger.warning(f"Database is empty ({recipe_count} recipes). Please load data using: python main.py load-db")
                     logger.info("The API will work but won't return any recommendations until data is loaded.")
                 else:
-                    logger.info(f"Database initialized with {recipe_count} recipes")
+                    logger.info(f"Database initialized with {recipe_count} recipes and {review_count} reviews")
+                    
+                    # Auto-load reviews from CSV if they're empty or have no content (for seamless 5-step setup)
+                    if review_count == 0 or (review_count > 0 and reviews_with_content == 0):
+                        if review_count == 0:
+                            logger.info("📦 No reviews found in database. Attempting to load from CSV...")
+                        else:
+                            logger.info("📦 Reviews exist but are empty (no ratings/text). Attempting to load from CSV...")
+                        
+                        # Try to find reviews CSV
+                        possible_review_paths = [
+                            Path("data/raw/reviews_clean_full.csv"),
+                            Path("data/raw/reviews.csv"),
+                        ]
+                        
+                        reviews_csv_path = None
+                        for path in possible_review_paths:
+                            if path.exists():
+                                reviews_csv_path = path
+                                break
+                        
+                        if reviews_csv_path:
+                            logger.info(f"   Found reviews CSV: {reviews_csv_path}")
+                            logger.info("   Loading reviews (this may take a few minutes)...")
+                            try:
+                                # Delete empty reviews first (if any)
+                                if review_count > 0:
+                                    session.query(Review).delete()
+                                    session.commit()
+                                    logger.info(f"   Deleted {review_count} empty reviews")
+                                
+                                # Load reviews from CSV
+                                db_instance.load_reviews_from_csv(str(reviews_csv_path))
+                                logger.info("✅ Reviews loaded successfully from CSV!")
+                                
+                                # Verify
+                                new_review_count = session.query(Review).count()
+                                new_reviews_with_content = session.query(Review).filter(
+                                    (Review.rating.isnot(None)) | (Review.review.isnot(None))
+                                ).count()
+                                logger.info(f"   Loaded {new_review_count} reviews ({new_reviews_with_content} with content)")
+                            except Exception as e:
+                                logger.error(f"❌ Failed to load reviews from CSV: {e}")
+                                logger.warning("   Reviews will remain empty - popular recipes will work but without ratings")
+                                import traceback
+                                logger.debug(traceback.format_exc())
+                        else:
+                            logger.warning("⚠️  Reviews CSV not found. Reviews will remain empty.")
+                            logger.info("   To load reviews: download reviews_clean_full.csv from Kaggle and place in data/raw/")
                     
                     # Schedule ingredients cache pre-calculation in background thread (after port binding!)
                     # This prevents Render timeout during startup - server binds port first, then cache loads

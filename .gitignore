@@ -16,6 +16,10 @@ ENV/
 data/raw/*.parquet
 !data/raw/recipes.csv
 !data/raw/reviews.csv
+# Exclude large uncompressed review files (will be auto-extracted from .gz)
+data/raw/reviews_clean_full.csv
+# Include compressed review file (auto-extracted on startup)
+!data/raw/reviews_clean_full.csv.gz
 # Processed files are generated automatically at startup
 data/processed/recipes.csv
 data/processed/train.csv

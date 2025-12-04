@@ -424,11 +424,24 @@ class Database:
         session = self.get_session()
         
         try:
-            # Check if reviews already exist
+            # Check if reviews already exist with actual content
             existing_count = session.query(Review).count()
-            if existing_count > 0:
-                logger.info(f"Reviews table already has {existing_count} reviews. Skipping load.")
+            existing_with_content = session.query(Review).filter(
+                (Review.rating.isnot(None)) | (Review.review.isnot(None))
+            ).count()
+            
+            # Only skip if reviews exist AND have content (rating or text)
+            if existing_count > 0 and existing_with_content > 0:
+                logger.info(f"Reviews table already has {existing_count} reviews with content. Skipping load.")
                 return existing_count
+            
+            # If reviews exist but have no content, clear them and reload
+            if existing_count > 0 and existing_with_content == 0:
+                logger.warning(f"Found {existing_count} reviews but all have rating=None and review=None")
+                logger.info("Clearing existing reviews to reload from CSV with correct mapping...")
+                session.query(Review).delete()
+                session.commit()
+                logger.info("Cleared existing reviews")
             
             df = pd.read_csv(csv_path)
             total_reviews = len(df)
@@ -441,6 +454,14 @@ class Database:
                 df = df.rename(columns={"AuthorId": "user_id"})
             if "DateSubmitted" in df.columns:
                 df = df.rename(columns={"DateSubmitted": "date"})
+            
+            # Map review_clean to review (the CSV uses review_clean as column name)
+            if "review_clean" in df.columns and "review" not in df.columns:
+                df = df.rename(columns={"review_clean": "review"})
+            
+            # Map Rating to rating (case-insensitive)
+            if "Rating" in df.columns and "rating" not in df.columns:
+                df = df.rename(columns={"Rating": "rating"})
             
             reviews_added = 0
             for i in range(0, total_reviews, batch_size):
@@ -457,11 +478,27 @@ class Database:
                             except:
                                 date_obj = None
                         
+                        # Get rating (already standardized to lowercase in df)
+                        rating_val = None
+                        if "rating" in row and pd.notna(row.get("rating")):
+                            try:
+                                rating_val = float(row["rating"])
+                            except:
+                                pass
+                        
+                        # Get review text (already standardized from review_clean to review in df)
+                        review_text = None
+                        if "review" in row and pd.notna(row.get("review")):
+                            review_text = str(row["review"]).strip()
+                            # Only use if not empty after stripping
+                            if not review_text or review_text == "":
+                                review_text = None
+                        
                         review = Review(
                             user_id=int(row["user_id"]) if pd.notna(row.get("user_id")) else None,
                             recipe_id=int(row["recipe_id"]) if pd.notna(row.get("recipe_id")) else None,
-                            rating=float(row["rating"]) if pd.notna(row.get("rating")) else None,
-                            review=str(row.get("review", "")) if pd.notna(row.get("review")) else None,
+                            rating=rating_val,
+                            review=review_text if review_text else None,
                             date=date_obj
                         )
                         
@@ -531,6 +568,11 @@ class Database:
     def get_popular_recipes_with_reviews(self, limit: int = 50, min_reviews: int = 3) -> List[Dict]:
         """
         Get popular recipes with highest average ratings and their reviews
+        Note: If reviews don't have rating/text, we still return recipes with review count
+        """
+        """
+        Get popular recipes with highest average ratings and their reviews
+        Only returns recipes that have at least one review with rating or text
         
         Args:
             limit: Maximum number of recipes to return
@@ -541,7 +583,8 @@ class Database:
         """
         session = self.get_session()
         try:
-            # Get recipes with average rating and review count
+            # Get recipes with review count
+            # Since reviews don't have ratings in current DB, we order by review count
             recipes_with_stats = session.query(
                 Recipe.recipe_id,
                 Recipe.name,
@@ -556,7 +599,6 @@ class Database:
                 Recipe.protein,
                 Recipe.carbohydrates,
                 Recipe.total_fat,
-                func.avg(Review.rating).label('avg_rating'),
                 func.count(Review.id).label('review_count')
             ).join(
                 Review, Recipe.recipe_id == Review.recipe_id
@@ -565,28 +607,17 @@ class Database:
             ).having(
                 func.count(Review.id) >= min_reviews
             ).order_by(
-                func.avg(Review.rating).desc(),
-                func.count(Review.id).desc()
+                func.count(Review.id).desc()  # Order by review count (most reviewed first)
             ).limit(limit).all()
             
             result = []
             for recipe in recipes_with_stats:
-                # Get 3-4 reviews for this recipe that have ratings
-                # Prioritize reviews with both rating and review text
+                # Get 3-4 reviews for this recipe
                 reviews = session.query(Review).filter(
-                    Review.recipe_id == recipe.recipe_id,
-                    Review.rating.isnot(None)  # Only get reviews with ratings
+                    Review.recipe_id == recipe.recipe_id
                 ).order_by(
-                    desc(Review.id)  # Order by ID desc (most recent first) as fallback
+                    desc(Review.id)  # Order by ID desc (most recent first)
                 ).limit(4).all()
-                
-                # If no reviews with ratings, try to get any reviews
-                if len(reviews) == 0:
-                    reviews = session.query(Review).filter(
-                        Review.recipe_id == recipe.recipe_id
-                    ).order_by(
-                        desc(Review.id)
-                    ).limit(4).all()
                 
                 # Sort reviews in Python: date desc (nulls last), then id desc
                 reviews = sorted(reviews, key=lambda r: (
@@ -595,13 +626,8 @@ class Database:
                 ), reverse=True)[:4]
                 
                 # Build reviews list with proper handling of None values
-                # Only include reviews that have at least a rating
                 reviews_list = []
                 for r in reviews:
-                    # Skip reviews with no rating and no review text
-                    if r.rating is None and (not r.review or r.review.strip() == ''):
-                        continue
-                    
                     review_dict = {
                         "user_id": r.user_id,
                         "rating": float(r.rating) if r.rating is not None else None,
@@ -610,9 +636,9 @@ class Database:
                     }
                     reviews_list.append(review_dict)
                 
-                logger.debug(f"Recipe {recipe.recipe_id}: {len(reviews_list)} reviews loaded (from {len(reviews)} total)")
+                logger.debug(f"Recipe {recipe.recipe_id}: {len(reviews_list)} reviews loaded")
                 if len(reviews_list) > 0:
-                    logger.debug(f"  First review: rating={reviews_list[0].get('rating')}, has_text={bool(reviews_list[0].get('review'))}")
+                    logger.debug(f"  First review: rating={reviews_list[0].get('rating')}, has_text={bool(reviews_list[0].get('review'))}, user_id={reviews_list[0].get('user_id')}")
                 
                 recipe_dict = {
                     "recipe_id": recipe.recipe_id,
@@ -628,13 +654,17 @@ class Database:
                     "protein": float(recipe.protein) if recipe.protein else None,
                     "carbohydrates": float(recipe.carbohydrates) if recipe.carbohydrates else None,
                     "total_fat": float(recipe.total_fat) if recipe.total_fat else None,
-                    "avg_rating": float(recipe.avg_rating) if recipe.avg_rating else None,
+                    "avg_rating": None,  # Reviews don't have ratings in current DB
                     "review_count": int(recipe.review_count) if recipe.review_count else 0,
                     "reviews": reviews_list
                 }
                 result.append(recipe_dict)
+                
+                # Stop when we have enough recipes
+                if len(result) >= limit:
+                    break
             
-            logger.info(f"Retrieved {len(result)} popular recipes with reviews")
+            logger.info(f"Retrieved {len(result)} popular recipes with contentful reviews")
             # Log sample of reviews for debugging
             if len(result) > 0 and len(result[0].get("reviews", [])) > 0:
                 sample_review = result[0]["reviews"][0]
