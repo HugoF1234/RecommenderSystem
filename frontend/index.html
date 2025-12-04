@@ -139,139 +139,121 @@
                     <p id="profileUserId" class="text-sm text-gray-500">ID: ---</p>
                 </div>
 
-                <!-- Allergies Section -->
-                <div>
-                    <label class="block text-lg font-semibold text-gray-900 mb-3">
-                        🚨 Allergies
-                    </label>
-                    <input type="text" id="profileAllergies" placeholder="Ex: gluten, dairy, nuts (séparés par des virgules)"
-                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    <p class="text-xs text-gray-500 mt-1">Ces ingrédients seront strictement exclus de vos recettes</p>
+                <!-- Profile Summary (if profile exists) -->
+                <div id="profileSummary" class="hidden bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div class="flex items-center space-x-2 mb-2">
+                        <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <h3 class="text-lg font-semibold text-green-800">Profil actif</h3>
+                    </div>
+                    <div id="profileSummaryContent" class="text-sm text-green-700 space-y-1">
+                        <!-- Summary will be populated by JavaScript -->
+                    </div>
+                    <p class="text-xs text-green-600 mt-2">Ces préférences sont appliquées automatiquement à vos recommandations</p>
                 </div>
 
-                <!-- Dietary Restrictions Section -->
-                <div>
+                <!-- SECTION 1: SÉCURITÉ -->
+                <div class="border-l-4 border-red-500 pl-4">
                     <label class="block text-lg font-semibold text-gray-900 mb-3">
-                        🥗 Restrictions alimentaires
+                        🚨 Allergies <span class="text-red-500 text-sm">(obligatoire si applicable)</span>
                     </label>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <label class="flex items-center space-x-2 cursor-pointer">
+                    <input type="text" id="profileAllergies" list="allergiesList" placeholder="Tapez pour voir les suggestions (ex: gluten, dairy, nuts)"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent">
+                    <datalist id="allergiesList">
+                        <!-- Options will be populated by JavaScript -->
+                    </datalist>
+                    <p class="text-xs text-gray-500 mt-1">⚠️ Ces ingrédients seront <strong>strictement exclus</strong> de vos recettes pour votre sécurité</p>
+                </div>
+
+                <!-- SECTION 2: RÉGIME ALIMENTAIRE -->
+                <div class="border-l-4 border-green-500 pl-4">
+                    <label class="block text-lg font-semibold text-gray-900 mb-3">
+                        🥗 Régime alimentaire
+                    </label>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                        <label class="flex items-center space-x-2 cursor-pointer p-2 rounded-lg hover:bg-green-50 transition-colors">
+                            <input type="checkbox" class="dietary-checkbox" value="none" id="dietary-none" class="w-4 h-4 text-green-500 rounded">
+                            <span class="text-sm font-medium">Aucun</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer p-2 rounded-lg hover:bg-green-50 transition-colors">
                             <input type="checkbox" class="dietary-checkbox" value="vegetarian" class="w-4 h-4 text-green-500 rounded">
-                            <span class="text-sm">Végétarien</span>
+                            <span class="text-sm font-medium">Végétarien</span>
                         </label>
-                        <label class="flex items-center space-x-2 cursor-pointer">
+                        <label class="flex items-center space-x-2 cursor-pointer p-2 rounded-lg hover:bg-green-50 transition-colors">
                             <input type="checkbox" class="dietary-checkbox" value="vegan" class="w-4 h-4 text-green-500 rounded">
-                            <span class="text-sm">Vegan</span>
+                            <span class="text-sm font-medium">Végan</span>
                         </label>
-                        <label class="flex items-center space-x-2 cursor-pointer">
+                        <label class="flex items-center space-x-2 cursor-pointer p-2 rounded-lg hover:bg-green-50 transition-colors">
                             <input type="checkbox" class="dietary-checkbox" value="gluten-free" class="w-4 h-4 text-green-500 rounded">
-                            <span class="text-sm">Sans gluten</span>
+                            <span class="text-sm font-medium">Sans gluten</span>
                         </label>
-                        <label class="flex items-center space-x-2 cursor-pointer">
+                        <label class="flex items-center space-x-2 cursor-pointer p-2 rounded-lg hover:bg-green-50 transition-colors">
                             <input type="checkbox" class="dietary-checkbox" value="dairy-free" class="w-4 h-4 text-green-500 rounded">
-                            <span class="text-sm">Sans lactose</span>
+                            <span class="text-sm font-medium">Sans lactose</span>
                         </label>
                     </div>
+                    <p class="text-xs text-gray-500 mt-2">Les recettes contenant des ingrédients interdits seront exclues</p>
                 </div>
 
-                <!-- Disliked Ingredients -->
-                <div>
+                <!-- SECTION 3: NUTRITION -->
+                <div class="border-l-4 border-blue-500 pl-4">
                     <label class="block text-lg font-semibold text-gray-900 mb-3">
-                        👎 Ingrédients que vous n'aimez pas
+                        🔥 Nutrition
                     </label>
-                    <input type="text" id="profileDisliked" placeholder="Ex: mushrooms, olives, anchovies (séparés par des virgules)"
-                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                </div>
-
-                <!-- Favorite Cuisines -->
-                <div>
-                    <label class="block text-lg font-semibold text-gray-900 mb-3">
-                        🌍 Cuisines préférées
-                    </label>
-                    <input type="text" id="profileCuisines" placeholder="Ex: italian, mexican, asian (séparés par des virgules)"
-                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                </div>
-
-                <!-- Nutritional Constraints -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">
-                            🔥 Calories max par recette
-                        </label>
-                        <input type="number" id="profileMaxCalories" placeholder="Ex: 600"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">
-                            💪 Protéines min (g)
-                        </label>
-                        <input type="number" id="profileMinProtein" placeholder="Ex: 20"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">
-                            🍞 Glucides max (g)
-                        </label>
-                        <input type="number" id="profileMaxCarbs" placeholder="Ex: 50"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">
-                            🥑 Lipides max (g)
-                        </label>
-                        <input type="number" id="profileMaxFat" placeholder="Ex: 30"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    </div>
-                </div>
-
-                <!-- Cooking Preferences -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">
-                            ⏱️ Temps de préparation max (minutes)
-                        </label>
-                        <input type="number" id="profileMaxPrepTime" placeholder="Ex: 30"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">
-                            👨‍🍳 Niveau de cuisine
-                        </label>
-                        <select id="profileSkillLevel" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                            <option value="">Choisir...</option>
-                            <option value="beginner">Débutant</option>
-                            <option value="intermediate">Intermédiaire</option>
-                            <option value="advanced">Avancé</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Taste Preferences -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">
-                            🌶️ Tolérance aux épices (0-10)
-                        </label>
-                        <input type="range" id="profileSpiceTolerance" min="0" max="10" value="5"
-                               class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
-                        <div class="flex justify-between text-xs text-gray-500 mt-1">
-                            <span>Aucune</span>
-                            <span id="spiceValue" class="font-semibold">5</span>
-                            <span>Très épicé</span>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                Calories maximum par recette
+                            </label>
+                            <input type="number" id="profileMaxCalories" placeholder="Ex: 600" min="0"
+                                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                💪 Protéines minimum (g)
+                            </label>
+                            <input type="number" id="profileMinProtein" placeholder="Ex: 20" min="0"
+                                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                🍞 Glucides maximum (g)
+                            </label>
+                            <input type="number" id="profileMaxCarbs" placeholder="Ex: 50" min="0"
+                                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                🥑 Lipides maximum (g)
+                            </label>
+                            <input type="number" id="profileMaxFat" placeholder="Ex: 30" min="0"
+                                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                         </div>
                     </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">
-                            🍰 Préférence sucrée (0-10)
-                        </label>
-                        <input type="range" id="profileSweetness" min="0" max="10" value="5"
-                               class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
-                        <div class="flex justify-between text-xs text-gray-500 mt-1">
-                            <span>Pas sucré</span>
-                            <span id="sweetnessValue" class="font-semibold">5</span>
-                            <span>Très sucré</span>
-                        </div>
-                    </div>
+                    <p class="text-xs text-gray-500 mt-2">Les recettes ne respectant pas ces contraintes seront exclues</p>
+                </div>
+
+                <!-- SECTION 4: PRÉFÉRENCES -->
+                <div class="border-l-4 border-purple-500 pl-4">
+                    <label class="block text-lg font-semibold text-gray-900 mb-3">
+                        👎 Ingrédients à éviter
+                    </label>
+                    <input type="text" id="profileDisliked" list="dislikedList" placeholder="Tapez pour voir les suggestions (ex: mushrooms, olives, anchovies)"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    <datalist id="dislikedList">
+                        <!-- Options will be populated by JavaScript -->
+                    </datalist>
+                    <p class="text-xs text-gray-500 mt-1">Les recettes contenant ces ingrédients seront exclues</p>
+                </div>
+
+                <div class="border-l-4 border-purple-500 pl-4">
+                    <label class="block text-lg font-semibold text-gray-900 mb-3">
+                        ⏱️ Temps de préparation maximum
+                    </label>
+                    <input type="number" id="profileMaxPrepTime" placeholder="Ex: 30" min="0"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    <p class="text-xs text-gray-500 mt-1">Les recettes nécessitant plus de temps seront exclues (en minutes)</p>
                 </div>
 
             </div>
@@ -296,6 +278,19 @@
     <!-- Main Content -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         
+        <!-- Shopping Section -->
+        <div class="bg-gradient-to-r from-green-50 to-blue-50 rounded-2xl shadow-lg p-6 mb-6 border border-green-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-900 mb-2">🛒 Je vais faire les courses</h2>
+                    <p class="text-gray-600">Découvrez les recettes les mieux notées avec leurs avis</p>
+                </div>
+                <button id="shoppingBtn" class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md transition-all transform hover:scale-105">
+                    Voir les recettes populaires
+                </button>
+            </div>
+        </div>
+
         <!-- Search Section -->
         <div class="bg-white rounded-2xl shadow-xl p-6 mb-10 border border-sky-100">
             <!-- Titles Row -->
@@ -478,14 +473,6 @@
         slideshowElement.style.backgroundImage = `url('${selectedBackground}')`;
         slideshowElement.style.opacity = '1';
 
-        // Profile Modal Slider Updates - Update slider value displays in real-time
-        document.getElementById('profileSpiceTolerance').addEventListener('input', function(e) {
-            document.getElementById('spiceValue').textContent = e.target.value;
-        });
-
-        document.getElementById('profileSweetness').addEventListener('input', function(e) {
-            document.getElementById('sweetnessValue').textContent = e.target.value;
-        });
     </script>
 </body>
 </html>

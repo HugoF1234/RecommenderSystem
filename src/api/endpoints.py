@@ -499,6 +499,43 @@ async def get_recipe(recipe_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/popular-recipes")
+async def get_popular_recipes(limit: int = 50):
+    """
+    Get popular recipes with highest ratings and their reviews
+    
+    Args:
+        limit: Maximum number of recipes to return
+        
+    Returns:
+        List of popular recipes with reviews
+    """
+    try:
+        from .main import db_instance
+        
+        if db_instance is None:
+            raise HTTPException(status_code=503, detail="Database not initialized")
+        
+        recipes = db_instance.get_popular_recipes_with_reviews(limit=limit, min_reviews=3)
+        
+        # Log for debugging
+        if recipes and len(recipes) > 0:
+            logger.info(f"Returning {len(recipes)} popular recipes")
+            sample_recipe = recipes[0]
+            logger.info(f"Sample recipe {sample_recipe.get('recipe_id')}: {len(sample_recipe.get('reviews', []))} reviews")
+            if sample_recipe.get('reviews'):
+                logger.info(f"  First review: rating={sample_recipe['reviews'][0].get('rating')}, has_text={bool(sample_recipe['reviews'][0].get('review'))}")
+        
+        return {
+            "recipes": recipes,
+            "count": len(recipes)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting popular recipes: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/ingredients")
 async def get_ingredients(limit: int = 500):
     """
@@ -1025,9 +1062,14 @@ def apply_user_profile_filters(recipes_df, user_profile: Dict):
 
     # 2. Filtrer par restrictions alimentaires (végétarien, végan, etc.)
     if user_profile.get('dietary_restrictions'):
-        logger.info(f"[2/5] Applying dietary restrictions: {user_profile['dietary_restrictions']}")
-        filtered_df = filter_recipes_by_dietary_restrictions(filtered_df, user_profile['dietary_restrictions'])
-        logger.info(f"      → Remaining recipes: {len(filtered_df)}")
+        # Exclure "none" de la liste des restrictions
+        restrictions = [r for r in user_profile['dietary_restrictions'] if r != 'none']
+        if restrictions:
+            logger.info(f"[2/5] Applying dietary restrictions: {restrictions}")
+            filtered_df = filter_recipes_by_dietary_restrictions(filtered_df, restrictions)
+            logger.info(f"      → Remaining recipes: {len(filtered_df)}")
+        else:
+            logger.info(f"[2/5] No dietary restrictions specified (user selected 'none'), skipping")
     else:
         logger.info(f"[2/5] No dietary restrictions specified, skipping")
 

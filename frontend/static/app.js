@@ -282,6 +282,31 @@ class SaveEatApp {
         this.loadCalibratedZones();
     }
     
+    populateAutocompleteLists() {
+        // Populate allergies and disliked ingredients datalists
+        const allergiesList = document.getElementById('allergiesList');
+        const dislikedList = document.getElementById('dislikedList');
+        
+        if (allergiesList && dislikedList && this.ingredients && this.ingredients.length > 0) {
+            // Clear existing options
+            allergiesList.innerHTML = '';
+            dislikedList.innerHTML = '';
+            
+            // Add all ingredients as options
+            this.ingredients.forEach(ingredient => {
+                const option1 = document.createElement('option');
+                option1.value = ingredient;
+                allergiesList.appendChild(option1);
+                
+                const option2 = document.createElement('option');
+                option2.value = ingredient;
+                dislikedList.appendChild(option2);
+            });
+            
+            console.log(`✅ Populated autocomplete lists with ${this.ingredients.length} ingredients`);
+        }
+    }
+    
     loadCalibratedZones() {
         const saved = localStorage.getItem('shelfZones');
         if (saved) {
@@ -322,36 +347,120 @@ class SaveEatApp {
             if (profile) {
                 console.log('✅ User profile loaded');
                 this.populateProfileForm(profile);
+                this.updateProfileIndicator();
+                // Pré-remplir les filtres de la page principale
+                this.populateMainPageFilters(profile);
             } else {
                 console.log('ℹ️ No profile found - user can create one');
+                this.updateProfileIndicator(false);
             }
         } catch (error) {
             console.error('Error loading user profile:', error);
+            this.updateProfileIndicator(false);
+        }
+    }
+    
+    populateMainPageFilters(profile) {
+        // Pré-remplir les filtres de la page principale avec le profil
+        if (!profile) return;
+        
+        // Temps maximum
+        if (profile.max_prep_time) {
+            const maxTimeInput = document.getElementById('maxTime');
+            if (maxTimeInput) {
+                maxTimeInput.value = profile.max_prep_time;
+            }
+        }
+        
+        // Calories maximum
+        if (profile.max_calories) {
+            const maxCaloriesInput = document.getElementById('maxCalories');
+            if (maxCaloriesInput) {
+                maxCaloriesInput.value = profile.max_calories;
+            }
+        }
+        
+        // Préférences alimentaires (boutons de la page principale)
+        if (profile.dietary_restrictions && profile.dietary_restrictions.length > 0) {
+            // Si "none" est dans les restrictions, ne pas cocher les autres
+            if (!profile.dietary_restrictions.includes('none')) {
+                // Cocher les boutons correspondants
+                profile.dietary_restrictions.forEach(restriction => {
+                    const btn = document.querySelector(`[data-pref="${restriction}"]`);
+                    if (btn) {
+                        btn.classList.remove('border-slate-200', 'text-slate-800', 'border-gray-300', 'text-gray-700');
+                        btn.classList.add('bg-green-500', 'text-white', 'border-green-500');
+                        this.selectedDietaryPrefs.add(restriction);
+                    }
+                });
+            }
+        }
+        
+        console.log('✅ Main page filters populated from profile');
+    }
+    
+    updateProfileIndicator(hasProfile = null) {
+        // Update profile button to show if profile is active
+        const profileButton = document.getElementById('profileButton');
+        if (!profileButton) return;
+        
+        // If hasProfile is null, check if profile exists
+        if (hasProfile === null) {
+            hasProfile = this.profileManager.hasProfile();
+        }
+        
+        if (hasProfile) {
+            // Add visual indicator that profile is active
+            profileButton.classList.add('relative');
+            if (!profileButton.querySelector('.profile-indicator')) {
+                const indicator = document.createElement('span');
+                indicator.className = 'profile-indicator absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white';
+                indicator.title = 'Profil actif';
+                profileButton.appendChild(indicator);
+            }
+            profileButton.title = 'Mon Profil (actif)';
+        } else {
+            // Remove indicator
+            const indicator = profileButton.querySelector('.profile-indicator');
+            if (indicator) {
+                indicator.remove();
+            }
+            profileButton.title = 'Mon Profil';
         }
     }
 
     populateProfileForm(profile) {
-        // Populate all form fields with profile data
+        // SECTION 1: SÉCURITÉ - Allergies
         if (profile.allergies) {
             document.getElementById('profileAllergies').value = profile.allergies.join(', ');
         }
 
+        // SECTION 2: RÉGIME ALIMENTAIRE - Dietary restrictions
         if (profile.dietary_restrictions) {
-            // Check corresponding checkboxes
-            document.querySelectorAll('.dietary-checkbox').forEach(checkbox => {
-                checkbox.checked = profile.dietary_restrictions.includes(checkbox.value);
-            });
+            // Si "none" est dans les restrictions, cocher uniquement "Aucun"
+            if (profile.dietary_restrictions.includes('none')) {
+                const noneCheckbox = document.getElementById('dietary-none');
+                if (noneCheckbox) {
+                    noneCheckbox.checked = true;
+                }
+                // Décocher tous les autres
+                document.querySelectorAll('.dietary-checkbox:not(#dietary-none)').forEach(checkbox => {
+                    checkbox.checked = false;
+                });
+            } else {
+                // Cocher les restrictions spécifiées
+                document.querySelectorAll('.dietary-checkbox').forEach(checkbox => {
+                    checkbox.checked = profile.dietary_restrictions.includes(checkbox.value);
+                });
+                // S'assurer que "Aucun" n'est pas coché
+                const noneCheckbox = document.getElementById('dietary-none');
+                if (noneCheckbox) {
+                    noneCheckbox.checked = false;
+                }
+            }
         }
 
-        if (profile.disliked_ingredients) {
-            document.getElementById('profileDisliked').value = profile.disliked_ingredients.join(', ');
-        }
-
-        if (profile.favorite_cuisines) {
-            document.getElementById('profileCuisines').value = profile.favorite_cuisines.join(', ');
-        }
-
-        // Nutritional values
+        // SECTION 3: NUTRITION - Nutritional values
         if (profile.max_calories) {
             document.getElementById('profileMaxCalories').value = profile.max_calories;
         }
@@ -365,25 +474,77 @@ class SaveEatApp {
             document.getElementById('profileMaxFat').value = profile.max_fat;
         }
 
-        // Cooking preferences
+        // SECTION 4: PRÉFÉRENCES - Disliked ingredients
+        if (profile.disliked_ingredients) {
+            document.getElementById('profileDisliked').value = profile.disliked_ingredients.join(', ');
+        }
+
+        // SECTION 4: PRÉFÉRENCES - Max prep time
         if (profile.max_prep_time) {
             document.getElementById('profileMaxPrepTime').value = profile.max_prep_time;
         }
-        if (profile.skill_level) {
-            document.getElementById('profileSkillLevel').value = profile.skill_level;
-        }
 
-        // Taste preferences (sliders)
-        if (profile.spice_tolerance !== null && profile.spice_tolerance !== undefined) {
-            document.getElementById('profileSpiceTolerance').value = profile.spice_tolerance;
-            document.getElementById('spiceValue').textContent = profile.spice_tolerance;
-        }
-        if (profile.sweetness_preference !== null && profile.sweetness_preference !== undefined) {
-            document.getElementById('profileSweetness').value = profile.sweetness_preference;
-            document.getElementById('sweetnessValue').textContent = profile.sweetness_preference;
-        }
+        // Update profile summary
+        this.updateProfileSummary(profile);
 
         console.log('✅ Profile form populated');
+    }
+    
+    updateProfileSummary(profile) {
+        const summaryDiv = document.getElementById('profileSummary');
+        const summaryContent = document.getElementById('profileSummaryContent');
+        
+        if (!summaryDiv || !summaryContent) return;
+        
+        if (!profile) {
+            summaryDiv.classList.add('hidden');
+            return;
+        }
+        
+        const summaryItems = [];
+        
+        // SECTION 1: SÉCURITÉ
+        if (profile.allergies && profile.allergies.length > 0) {
+            summaryItems.push(`🚨 Allergies: ${profile.allergies.join(', ')}`);
+        }
+        
+        // SECTION 2: RÉGIME ALIMENTAIRE
+        if (profile.dietary_restrictions && profile.dietary_restrictions.length > 0) {
+            const restrictionLabels = {
+                'vegetarian': 'Végétarien',
+                'vegan': 'Végan',
+                'gluten-free': 'Sans gluten',
+                'dairy-free': 'Sans lactose'
+            };
+            const labels = profile.dietary_restrictions.map(r => restrictionLabels[r] || r);
+            summaryItems.push(`🥗 Régime: ${labels.join(', ')}`);
+        }
+        
+        // SECTION 3: NUTRITION
+        const nutritionItems = [];
+        if (profile.max_calories) nutritionItems.push(`Calories ≤ ${profile.max_calories}`);
+        if (profile.min_protein) nutritionItems.push(`Protéines ≥ ${profile.min_protein}g`);
+        if (profile.max_carbs) nutritionItems.push(`Glucides ≤ ${profile.max_carbs}g`);
+        if (profile.max_fat) nutritionItems.push(`Lipides ≤ ${profile.max_fat}g`);
+        if (nutritionItems.length > 0) {
+            summaryItems.push(`🔥 Nutrition: ${nutritionItems.join(', ')}`);
+        }
+        
+        // SECTION 4: PRÉFÉRENCES
+        if (profile.disliked_ingredients && profile.disliked_ingredients.length > 0) {
+            summaryItems.push(`👎 Évite: ${profile.disliked_ingredients.slice(0, 3).join(', ')}${profile.disliked_ingredients.length > 3 ? '...' : ''}`);
+        }
+        
+        if (profile.max_prep_time) {
+            summaryItems.push(`⏱️ Temps max: ${profile.max_prep_time} min`);
+        }
+        
+        if (summaryItems.length > 0) {
+            summaryContent.innerHTML = summaryItems.map(item => `<p>${item}</p>`).join('');
+            summaryDiv.classList.remove('hidden');
+        } else {
+            summaryDiv.classList.add('hidden');
+        }
     }
 
     async loadIngredients(retryCount = 0) {
@@ -402,6 +563,8 @@ class SaveEatApp {
                 this.filteredIngredients = [...this.ingredients];
                 this.renderIngredients();
                 this.renderSelectedIngredients();
+                // Populate autocomplete lists after ingredients are loaded
+                this.populateAutocompleteLists();
                 console.log(`✅ Loaded ${this.ingredients.length} ingredients`);
             } else if (data.status === 'loading' && retryCount < 10) {
                 // Cache still loading - show message and retry
@@ -833,6 +996,31 @@ class SaveEatApp {
                 this.closeProfileModal();
             }
         });
+        
+        // Gérer l'option "Aucun" pour le régime alimentaire
+        const dietaryNoneCheckbox = document.getElementById('dietary-none');
+        if (dietaryNoneCheckbox) {
+            dietaryNoneCheckbox.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    // Si "Aucun" est coché, décocher tous les autres
+                    document.querySelectorAll('.dietary-checkbox:not(#dietary-none)').forEach(checkbox => {
+                        checkbox.checked = false;
+                    });
+                }
+            });
+        }
+        
+        // Si une autre option est cochée, décocher "Aucun"
+        document.querySelectorAll('.dietary-checkbox:not(#dietary-none)').forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    const noneCheckbox = document.getElementById('dietary-none');
+                    if (noneCheckbox) {
+                        noneCheckbox.checked = false;
+                    }
+                }
+            });
+        });
 
         // Dietary preferences
         document.querySelectorAll('.dietary-btn').forEach(btn => {
@@ -852,6 +1040,9 @@ class SaveEatApp {
 
         // Search button
         document.getElementById('searchBtn').addEventListener('click', () => this.searchRecipes());
+        
+        // Shopping button - Load popular recipes
+        document.getElementById('shoppingBtn').addEventListener('click', () => this.loadPopularRecipes());
 
         // Enter key on inputs
         ['maxTime', 'maxCalories', 'topK'].forEach(id => {
@@ -888,7 +1079,13 @@ class SaveEatApp {
             const success = await this.profileManager.saveProfile(userId, profileData);
 
             if (success) {
-                alert('✅ Profil enregistré avec succès !');
+                // Reload profile to get updated data
+                await this.loadUserProfile();
+                
+                // Update UI to show profile is active
+                this.updateProfileIndicator();
+                
+                alert('✅ Profil enregistré avec succès ! Vos préférences seront appliquées aux recommandations.');
                 this.closeProfileModal();
             } else {
                 alert('❌ Erreur lors de l\'enregistrement du profil');
@@ -902,34 +1099,34 @@ class SaveEatApp {
     collectProfileData() {
         const data = {};
 
-        // Allergies
+        // SECTION 1: SÉCURITÉ - Allergies
         const allergies = document.getElementById('profileAllergies').value.trim();
         if (allergies) {
             data.allergies = allergies.split(',').map(a => a.trim()).filter(a => a);
         }
 
-        // Dietary restrictions (checkboxes)
+        // SECTION 2: RÉGIME ALIMENTAIRE - Dietary restrictions (checkboxes)
         const restrictions = [];
         document.querySelectorAll('.dietary-checkbox:checked').forEach(checkbox => {
-            restrictions.push(checkbox.value);
+            const value = checkbox.value;
+            // Si "none" est coché, ne pas inclure les autres
+            if (value === 'none') {
+                restrictions.length = 0; // Clear array
+                restrictions.push('none');
+            } else {
+                // Ne pas ajouter si "none" est déjà dans la liste
+                if (!restrictions.includes('none')) {
+                    restrictions.push(value);
+                }
+            }
         });
-        if (restrictions.length > 0) {
-            data.dietary_restrictions = restrictions;
+        // Si aucune restriction n'est cochée, ajouter "none"
+        if (restrictions.length === 0) {
+            restrictions.push('none');
         }
+        data.dietary_restrictions = restrictions;
 
-        // Disliked ingredients
-        const disliked = document.getElementById('profileDisliked').value.trim();
-        if (disliked) {
-            data.disliked_ingredients = disliked.split(',').map(d => d.trim()).filter(d => d);
-        }
-
-        // Favorite cuisines
-        const cuisines = document.getElementById('profileCuisines').value.trim();
-        if (cuisines) {
-            data.favorite_cuisines = cuisines.split(',').map(c => c.trim()).filter(c => c);
-        }
-
-        // Nutritional constraints
+        // SECTION 3: NUTRITION - Nutritional constraints
         const maxCalories = document.getElementById('profileMaxCalories').value;
         if (maxCalories) data.max_calories = parseFloat(maxCalories);
 
@@ -942,19 +1139,15 @@ class SaveEatApp {
         const maxFat = document.getElementById('profileMaxFat').value;
         if (maxFat) data.max_fat = parseFloat(maxFat);
 
-        // Cooking preferences
+        // SECTION 4: PRÉFÉRENCES - Disliked ingredients
+        const disliked = document.getElementById('profileDisliked').value.trim();
+        if (disliked) {
+            data.disliked_ingredients = disliked.split(',').map(d => d.trim()).filter(d => d);
+        }
+
+        // SECTION 4: PRÉFÉRENCES - Max prep time
         const maxPrepTime = document.getElementById('profileMaxPrepTime').value;
         if (maxPrepTime) data.max_prep_time = parseFloat(maxPrepTime);
-
-        const skillLevel = document.getElementById('profileSkillLevel').value;
-        if (skillLevel) data.skill_level = skillLevel;
-
-        // Taste preferences
-        const spiceTolerance = document.getElementById('profileSpiceTolerance').value;
-        if (spiceTolerance) data.spice_tolerance = parseInt(spiceTolerance);
-
-        const sweetness = document.getElementById('profileSweetness').value;
-        if (sweetness) data.sweetness_preference = parseInt(sweetness);
 
         return data;
     }
@@ -969,6 +1162,10 @@ class SaveEatApp {
             const success = await this.profileManager.deleteProfile(userId);
 
             if (success) {
+                // Update UI to show profile is no longer active
+                this.updateProfileIndicator(false);
+                this.updateProfileSummary(null);
+                
                 alert('✅ Profil supprimé avec succès');
                 this.clearProfileForm();
                 this.closeProfileModal();
@@ -982,27 +1179,258 @@ class SaveEatApp {
     }
 
     clearProfileForm() {
-        // Clear all form fields
+        // SECTION 1: SÉCURITÉ
         document.getElementById('profileAllergies').value = '';
-        document.getElementById('profileDisliked').value = '';
-        document.getElementById('profileCuisines').value = '';
+        
+        // SECTION 2: RÉGIME ALIMENTAIRE
+        document.querySelectorAll('.dietary-checkbox').forEach(checkbox => {
+            checkbox.checked = false;
+        });
+        // Cocher "Aucun" par défaut
+        const noneCheckbox = document.getElementById('dietary-none');
+        if (noneCheckbox) {
+            noneCheckbox.checked = true;
+        }
+        
+        // SECTION 3: NUTRITION
         document.getElementById('profileMaxCalories').value = '';
         document.getElementById('profileMinProtein').value = '';
         document.getElementById('profileMaxCarbs').value = '';
         document.getElementById('profileMaxFat').value = '';
+        
+        // SECTION 4: PRÉFÉRENCES
+        document.getElementById('profileDisliked').value = '';
         document.getElementById('profileMaxPrepTime').value = '';
-        document.getElementById('profileSkillLevel').value = '';
-        document.getElementById('profileSpiceTolerance').value = '5';
-        document.getElementById('profileSweetness').value = '5';
-        document.getElementById('spiceValue').textContent = '5';
-        document.getElementById('sweetnessValue').textContent = '5';
-
-        // Uncheck all dietary checkboxes
-        document.querySelectorAll('.dietary-checkbox').forEach(checkbox => {
-            checkbox.checked = false;
-        });
 
         console.log('🧹 Profile form cleared');
+    }
+
+    async loadPopularRecipes() {
+        // Show loading
+        document.getElementById('resultsSection').classList.add('hidden');
+        document.getElementById('emptyState').classList.add('hidden');
+        document.getElementById('loadingState').classList.remove('hidden');
+        
+        // Scroll to results
+        document.getElementById('loadingState').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+        try {
+            console.log('🛒 Loading popular recipes...');
+            
+            const response = await fetch('/api/v1/popular-recipes?limit=50');
+            const data = await response.json();
+            
+            console.log('✅ Received popular recipes:', data);
+            
+            // Debug: log first recipe's reviews
+            if (data.recipes && data.recipes.length > 0) {
+                const firstRecipe = data.recipes[0];
+                console.log(`📊 First recipe (ID: ${firstRecipe.recipe_id}):`, {
+                    name: firstRecipe.name,
+                    avg_rating: firstRecipe.avg_rating,
+                    review_count: firstRecipe.review_count,
+                    reviews: firstRecipe.reviews,
+                    reviews_count: firstRecipe.reviews ? firstRecipe.reviews.length : 0
+                });
+                if (firstRecipe.reviews && firstRecipe.reviews.length > 0) {
+                    console.log('📝 First review sample:', firstRecipe.reviews[0]);
+                }
+            }
+            
+            // Hide loading
+            document.getElementById('loadingState').classList.add('hidden');
+            
+            if (data.recipes && data.recipes.length > 0) {
+                // Display recipes with reviews
+                await this.displayPopularRecipes(data.recipes);
+            } else {
+                document.getElementById('emptyState').classList.remove('hidden');
+            }
+            
+        } catch (error) {
+            console.error('Error loading popular recipes:', error);
+            document.getElementById('loadingState').classList.add('hidden');
+            alert(`❌ Erreur: ${error.message}`);
+        }
+    }
+    
+    async displayPopularRecipes(recipes) {
+        // Update count
+        document.getElementById('resultsCount').textContent = recipes.length;
+        
+        // Render recipes with reviews
+        const grid = document.getElementById('recipesGrid');
+        grid.innerHTML = recipes.map(recipe => this.createRecipeCardWithReviews(recipe)).join('');
+        
+        // Show results
+        document.getElementById('resultsSection').classList.remove('hidden');
+        document.getElementById('resultsSection').classList.add('fade-in');
+        
+        // Smooth scroll
+        document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    
+    createRecipeCardWithReviews(recipe) {
+        const {
+            recipe_id,
+            name,
+            description,
+            image_url,
+            minutes,
+            calories,
+            protein,
+            carbohydrates,
+            total_fat,
+            ingredients_list,
+            n_ingredients,
+            avg_rating,
+            review_count,
+            reviews
+        } = recipe;
+        
+        // Nutrition info
+        const nutritionHTML = this.createNutritionBars(calories, protein, carbohydrates, total_fat);
+        
+        // Rating display
+        const ratingHTML = avg_rating ? `
+            <div class="flex items-center space-x-2 mb-2">
+                <div class="flex items-center">
+                    ${this.renderStars(avg_rating)}
+                </div>
+                <span class="text-sm font-semibold text-gray-700">${avg_rating.toFixed(1)}</span>
+                <span class="text-xs text-gray-500">(${review_count} avis)</span>
+            </div>
+        ` : '';
+        
+        // Reviews display (3-4 reviews)
+        // Filter out reviews with no rating
+        const validReviews = reviews ? reviews.filter(r => r.rating !== null && r.rating !== undefined) : [];
+        const reviewsHTML = validReviews && validReviews.length > 0 ? `
+            <div class="mt-3 border-t pt-3">
+                <h4 class="text-sm font-semibold text-gray-700 mb-2">💬 Avis récents</h4>
+                <div class="space-y-2 max-h-48 overflow-y-auto">
+                    ${validReviews.slice(0, 4).map(review => {
+                        const rating = review.rating !== null && review.rating !== undefined ? review.rating : 0;
+                        const reviewText = review.review ? review.review.trim() : '';
+                        return `
+                        <div class="bg-gray-50 rounded-lg p-2">
+                            <div class="flex items-center justify-between mb-1">
+                                <div class="flex items-center space-x-1">
+                                    ${this.renderStars(rating)}
+                                </div>
+                                <span class="text-xs text-gray-500">User ${review.user_id}</span>
+                            </div>
+                            ${reviewText ? `<p class="text-xs text-gray-700 line-clamp-2">${reviewText}</p>` : '<p class="text-xs text-gray-400 italic">Aucun commentaire</p>'}
+                        </div>
+                    `;
+                    }).join('')}
+                </div>
+            </div>
+        ` : '';
+        
+        // Image with fallback
+        const imageHTML = image_url ? 
+            `<img src="${image_url}" alt="${name}" class="w-full h-48 object-cover" onerror="this.src='https://via.placeholder.com/400x300?text=Save+Eat'">` :
+            `<div class="w-full h-48 bg-green-100 flex items-center justify-center">
+                <svg class="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"></path>
+                </svg>
+            </div>`;
+        
+        return `
+            <div class="recipe-card bg-white rounded-xl shadow-lg overflow-hidden relative" data-recipe-id="${recipe_id}">
+                <!-- Close button (top right) -->
+                <button onclick="app.removeRecipe(${recipe_id})" 
+                        class="absolute top-2 right-2 bg-white rounded-full p-1.5 shadow-lg hover:bg-gray-100 z-10 transition-all opacity-80 hover:opacity-100">
+                    <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+                
+                <!-- Image -->
+                ${imageHTML}
+                
+                <!-- Content -->
+                <div class="p-5">
+                    <!-- Header -->
+                    <div class="flex items-start justify-between mb-3">
+                        <h3 class="text-lg font-bold text-gray-900 line-clamp-2 flex-1">
+                            ${name || 'Recette sans titre'}
+                        </h3>
+                    </div>
+                    
+                    <!-- Rating -->
+                    ${ratingHTML}
+                    
+                    <!-- Description -->
+                    ${description ? `<p class="text-sm text-gray-600 line-clamp-2 mb-3">${description}</p>` : ''}
+                    
+                    <!-- Stats -->
+                    <div class="flex items-center justify-between mb-3 text-sm text-gray-600">
+                        <div class="flex items-center space-x-4">
+                            ${minutes ? `
+                                <span class="flex items-center">
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    ${Math.round(minutes)} min
+                                </span>
+                            ` : ''}
+                            ${calories ? `
+                                <span class="flex items-center">
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"></path>
+                                    </svg>
+                                    ${Math.round(calories)} cal
+                                </span>
+                            ` : ''}
+                        </div>
+                        ${n_ingredients ? `
+                            <span class="text-xs font-medium text-gray-500">
+                                ${n_ingredients} ingrédients
+                            </span>
+                        ` : ''}
+                    </div>
+                    
+                    <!-- Nutrition Bars -->
+                    ${nutritionHTML}
+                    
+                    <!-- Reviews -->
+                    ${reviewsHTML}
+                    
+                    <!-- Actions -->
+                    <button onclick="app.viewRecipe(${recipe_id})" 
+                            class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-all transform hover:scale-[1.02] mt-3">
+                        Voir la recette
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+    
+    renderStars(rating) {
+        const fullStars = Math.floor(rating);
+        const hasHalfStar = rating % 1 >= 0.5;
+        const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+        
+        let starsHTML = '';
+        
+        // Full stars
+        for (let i = 0; i < fullStars; i++) {
+            starsHTML += '<svg class="w-4 h-4 text-yellow-400 fill-current" viewBox="0 0 20 20"><path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/></svg>';
+        }
+        
+        // Half star
+        if (hasHalfStar) {
+            starsHTML += '<svg class="w-4 h-4 text-yellow-400 fill-current" viewBox="0 0 20 20"><path d="M10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545L10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0z" fill-opacity="0.5"/></svg>';
+        }
+        
+        // Empty stars
+        for (let i = 0; i < emptyStars; i++) {
+            starsHTML += '<svg class="w-4 h-4 text-gray-300 fill-current" viewBox="0 0 20 20"><path d="M10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545L10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0z"/></svg>';
+        }
+        
+        return starsHTML;
     }
 
     async searchRecipes() {

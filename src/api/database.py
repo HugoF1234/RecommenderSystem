@@ -3,7 +3,7 @@ Database module for Save Eat
 Manages PostgreSQL/SQLite database for interactions
 """
 
-from sqlalchemy import create_engine, Column, Integer, Float, String, DateTime, Text, JSON
+from sqlalchemy import create_engine, Column, Integer, Float, String, DateTime, Text, JSON, func, desc, nullslast
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from datetime import datetime
 from typing import Optional, Dict, List
@@ -524,6 +524,125 @@ class Database:
             
         except Exception as e:
             logger.error(f"Failed to get ingredients: {e}", exc_info=True)
+            return []
+        finally:
+            session.close()
+    
+    def get_popular_recipes_with_reviews(self, limit: int = 50, min_reviews: int = 3) -> List[Dict]:
+        """
+        Get popular recipes with highest average ratings and their reviews
+        
+        Args:
+            limit: Maximum number of recipes to return
+            min_reviews: Minimum number of reviews required
+            
+        Returns:
+            List of recipe dictionaries with reviews included
+        """
+        session = self.get_session()
+        try:
+            # Get recipes with average rating and review count
+            recipes_with_stats = session.query(
+                Recipe.recipe_id,
+                Recipe.name,
+                Recipe.description,
+                Recipe.ingredients_list,
+                Recipe.steps_list,
+                Recipe.image_url,
+                Recipe.minutes,
+                Recipe.n_steps,
+                Recipe.n_ingredients,
+                Recipe.calories,
+                Recipe.protein,
+                Recipe.carbohydrates,
+                Recipe.total_fat,
+                func.avg(Review.rating).label('avg_rating'),
+                func.count(Review.id).label('review_count')
+            ).join(
+                Review, Recipe.recipe_id == Review.recipe_id
+            ).group_by(
+                Recipe.recipe_id
+            ).having(
+                func.count(Review.id) >= min_reviews
+            ).order_by(
+                func.avg(Review.rating).desc(),
+                func.count(Review.id).desc()
+            ).limit(limit).all()
+            
+            result = []
+            for recipe in recipes_with_stats:
+                # Get 3-4 reviews for this recipe that have ratings
+                # Prioritize reviews with both rating and review text
+                reviews = session.query(Review).filter(
+                    Review.recipe_id == recipe.recipe_id,
+                    Review.rating.isnot(None)  # Only get reviews with ratings
+                ).order_by(
+                    desc(Review.id)  # Order by ID desc (most recent first) as fallback
+                ).limit(4).all()
+                
+                # If no reviews with ratings, try to get any reviews
+                if len(reviews) == 0:
+                    reviews = session.query(Review).filter(
+                        Review.recipe_id == recipe.recipe_id
+                    ).order_by(
+                        desc(Review.id)
+                    ).limit(4).all()
+                
+                # Sort reviews in Python: date desc (nulls last), then id desc
+                reviews = sorted(reviews, key=lambda r: (
+                    r.date if r.date else datetime.min,
+                    r.id
+                ), reverse=True)[:4]
+                
+                # Build reviews list with proper handling of None values
+                # Only include reviews that have at least a rating
+                reviews_list = []
+                for r in reviews:
+                    # Skip reviews with no rating and no review text
+                    if r.rating is None and (not r.review or r.review.strip() == ''):
+                        continue
+                    
+                    review_dict = {
+                        "user_id": r.user_id,
+                        "rating": float(r.rating) if r.rating is not None else None,
+                        "review": str(r.review).strip() if r.review and str(r.review).strip() else None,
+                        "date": r.date.isoformat() if r.date else None
+                    }
+                    reviews_list.append(review_dict)
+                
+                logger.debug(f"Recipe {recipe.recipe_id}: {len(reviews_list)} reviews loaded (from {len(reviews)} total)")
+                if len(reviews_list) > 0:
+                    logger.debug(f"  First review: rating={reviews_list[0].get('rating')}, has_text={bool(reviews_list[0].get('review'))}")
+                
+                recipe_dict = {
+                    "recipe_id": recipe.recipe_id,
+                    "name": recipe.name,
+                    "description": recipe.description,
+                    "ingredients_list": recipe.ingredients_list,
+                    "steps_list": recipe.steps_list,
+                    "image_url": recipe.image_url,
+                    "minutes": recipe.minutes,
+                    "n_steps": recipe.n_steps,
+                    "n_ingredients": recipe.n_ingredients,
+                    "calories": float(recipe.calories) if recipe.calories else None,
+                    "protein": float(recipe.protein) if recipe.protein else None,
+                    "carbohydrates": float(recipe.carbohydrates) if recipe.carbohydrates else None,
+                    "total_fat": float(recipe.total_fat) if recipe.total_fat else None,
+                    "avg_rating": float(recipe.avg_rating) if recipe.avg_rating else None,
+                    "review_count": int(recipe.review_count) if recipe.review_count else 0,
+                    "reviews": reviews_list
+                }
+                result.append(recipe_dict)
+            
+            logger.info(f"Retrieved {len(result)} popular recipes with reviews")
+            # Log sample of reviews for debugging
+            if len(result) > 0 and len(result[0].get("reviews", [])) > 0:
+                sample_review = result[0]["reviews"][0]
+                logger.info(f"Sample review data: rating={sample_review.get('rating')}, has_text={bool(sample_review.get('review'))}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Failed to get popular recipes: {e}")
             return []
         finally:
             session.close()
