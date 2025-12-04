@@ -75,5 +75,5 @@ if __name__ == "__main__":
     print("📍 Server will be available at: http://localhost:8000")
     print("📚 API Documentation: http://localhost:8000/docs")
     print("⚡ Press CTRL+C to stop\n")
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 
