@@ -53,6 +53,17 @@
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
+        .background-slideshow {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
         .saveeat-card {
             background: radial-gradient(circle at top left, rgba(56,189,248,0.08), rgba(34,197,94,0.10));
             border: 1px solid rgba(15,118,110,0.35);
@@ -69,7 +80,9 @@
         }
     </style>
 </head>
-<body class="bg-gradient-to-br from-sky-50 via-emerald-50 to-white min-h-screen text-slate-800">
+<body class="min-h-screen text-slate-800">
+    <!-- Background Slideshow -->
+    <div id="backgroundSlideshow" class="background-slideshow"></div>
     
     <!-- Header -->
     <header class="saveeat-header shadow-md sticky top-0 z-50 border-b border-emerald-700/60">
@@ -100,13 +113,19 @@
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         
         <!-- Search Section -->
-        <div class="bg-white rounded-2xl shadow-xl p-8 mb-10 border border-sky-100">
-            <h2 class="text-2xl font-bold text-slate-900 mb-6">🔍 Trouvez votre recette idéale</h2>
+        <div class="bg-white rounded-2xl shadow-xl p-6 mb-10 border border-sky-100">
+            <!-- Titles Row -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 items-center mb-0">
+                <h2 class="text-2xl font-bold text-slate-900 md:col-span-3 text-center mb-0">🔍 Trouvez votre recette idéale</h2>
+                <p class="text-lg font-semibold text-slate-800 text-center md:col-span-1">
+                    Mes réserves
+                </p>
+            </div>
             
             <!-- Ingredients Selection -->
-            <div class="mb-6 grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
+            <div class="mb-6 grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
                 <!-- Left: all ingredients + search -->
-                <div class="md:col-span-3">
+                <div class="md:col-span-3 flex flex-col justify-center">
                     <label class="block text-sm font-semibold text-slate-800 mb-3">
                         Ingrédients disponibles
                     </label>
@@ -119,17 +138,17 @@
                             class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent placeholder-slate-400 text-sm"
                         >
                     </div>
-                    <div id="ingredientsContainer" class="flex flex-wrap gap-2 min-h-[100px] max-h-[300px] overflow-y-auto p-4 bg-sky-50 rounded-lg">
+                    <div id="ingredientsContainer" class="flex flex-wrap gap-2 min-h-[100px] max-h-[300px] overflow-y-auto p-3 bg-sky-50 rounded-lg">
                         <div class="loading-spinner mx-auto my-4"></div>
                     </div>
                 </div>
 
                 <!-- Right: selected ingredients highlight -->
-                <div class="md:col-span-1 flex flex-col items-stretch mt-14">
-                    <p class="text-sm font-semibold text-slate-800 mb-2 text-center">
-                        Ingrédients sélectionnés
-                    </p>
-                    <div id="selectedIngredientsContainer" class="min-h-[120px] flex flex-wrap gap-2 bg-white border border-slate-200 rounded-lg px-3 py-3">
+                <div class="md:col-span-1 flex flex-col items-stretch">
+                    <div id="selectedIngredientsContainer" class="relative min-h-[300px] bg-white border border-slate-200 rounded-lg overflow-hidden">
+                        <img src="/static/etagere.png" alt="Étagère" class="w-full h-full object-contain">
+                        <div id="ingredientsOverlay" class="absolute inset-0">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -254,5 +273,27 @@
     </footer>
 
     <script src="/static/app.js"></script>
+    <script>
+        // Background aléatoire - un fond choisi au hasard au chargement
+        const backgrounds = [
+            '/static/fond/fond4.png',
+            '/static/fond/fond5.png',
+            '/static/fond/fond6.png',
+            '/static/fond/fond7.png',
+            '/static/fond/fond8.png',
+            '/static/fond/fond9.png',
+            '/static/fond/fond10.png'
+        ];
+        
+        const slideshowElement = document.getElementById('backgroundSlideshow');
+        
+        // Choisir un fond au hasard
+        const randomIndex = Math.floor(Math.random() * backgrounds.length);
+        const selectedBackground = backgrounds[randomIndex];
+        
+        // Afficher le fond choisi
+        slideshowElement.style.backgroundImage = `url('${selectedBackground}')`;
+        slideshowElement.style.opacity = '1';
+    </script>
 </body>
 </html>

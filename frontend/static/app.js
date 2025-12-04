@@ -7,6 +7,17 @@ class SaveEatApp {
         this.selectedDietaryPrefs = new Set();
         this.ingredients = [];
         this.filteredIngredients = [];
+        // Stockage des positions fixes de chaque ingrédient
+        this.ingredientPositions = new Map(); // Map<ingredient, {x, y, shelf}>
+        // Configuration des zones d'étagères (en %)
+        this.shelfZones = [
+            { top: 3, bottom: 18, left: 5, right: 5 }, // Étagère 1
+            { top: 20, bottom: 35, left: 5, right: 5 }, // Étagère 2
+            { top: 37, bottom: 52, left: 5, right: 5 }, // Étagère 3
+            { top: 54, bottom: 69, left: 5, right: 5 }, // Étagère 4
+            { top: 71, bottom: 86, left: 5, right: 5 }, // Étagère 5
+            { top: 88, bottom: 97, left: 5, right: 5 }  // Étagère 6
+        ];
         this.init();
     }
 
@@ -14,6 +25,16 @@ class SaveEatApp {
         console.log('🚀 Initializing Save Eat App...');
         await this.loadIngredients();
         this.setupEventListeners();
+        
+        // Charger la calibration sauvegardée si elle existe
+        const saved = localStorage.getItem('shelfZones');
+        if (saved) {
+            try {
+                this.shelfZones = JSON.parse(saved);
+            } catch (e) {
+                console.warn('Erreur lors du chargement de la calibration:', e);
+            }
+        }
     }
 
     async loadIngredients(retryCount = 0) {
@@ -123,36 +144,265 @@ class SaveEatApp {
     }
 
     renderSelectedIngredients() {
-        const container = document.getElementById('selectedIngredientsContainer');
-        if (!container) return;
+        const overlay = document.getElementById('ingredientsOverlay');
+        if (!overlay) return;
 
         const selected = Array.from(this.selectedIngredients);
 
         if (selected.length === 0) {
-            container.innerHTML = '';
+            overlay.innerHTML = '';
+            this.ingredientPositions.clear();
             return;
         }
 
-        container.innerHTML = selected.map(ing => `
-            <button 
-                data-ingredient="${ing}"
-                class="flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 text-xs font-medium border border-emerald-300 hover:bg-emerald-200 transition-all">
-                <span>${this.capitalize(ing)}</span>
-                <span class="text-emerald-700 text-xs font-bold">×</span>
-            </button>
-        `).join('');
-
-        // Clicking on a selected chip removes it and updates both lists
-        container.querySelectorAll('button[data-ingredient]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const ing = btn.dataset.ingredient;
-                if (this.selectedIngredients.has(ing)) {
-                    this.selectedIngredients.delete(ing);
-                    this.renderIngredients();
-                    this.renderSelectedIngredients();
+        // Attendre que le conteneur soit rendu pour avoir ses dimensions
+        setTimeout(() => {
+            const containerWidth = overlay.offsetWidth || 300;
+            const containerHeight = overlay.offsetHeight || 300;
+            
+            // Configuration : 6 zones rouges (étagères)
+            const numShelves = 6;
+            const chipWidth = 65; // Largeur réduite en px
+            const chipHeight = 20; // Hauteur réduite en px
+            const chipSpacing = 0; // Pas d'espacement entre les chips empilés
+            
+            // Utiliser les zones calibrées
+            const shelfZones = this.shelfZones.map(zone => ({
+                top: zone.top,
+                bottom: zone.bottom,
+                height: zone.bottom - zone.top,
+                left: zone.left,
+                right: zone.right
+            }));
+            
+            // Pour chaque ingrédient, utiliser sa position existante ou en créer une nouvelle
+            const placedItems = [];
+            // Structure pour suivre les positions occupées par étagère : {x, width, y, stackHeight}
+            const shelfOccupancy = Array(numShelves).fill(0).map(() => []);
+            
+            // D'abord, reconstruire les positions existantes dans shelfOccupancy
+            const chipHeightPercent = (chipHeight / containerHeight) * 100;
+            selected.forEach((ing) => {
+                if (this.ingredientPositions.has(ing)) {
+                    const pos = this.ingredientPositions.get(ing);
+                    shelfOccupancy[pos.shelf].push({
+                        x: pos.x,
+                        width: chipWidth,
+                        y: pos.y,
+                        height: chipHeightPercent
+                    });
                 }
             });
+            
+            // Ensuite, placer les ingrédients (existants ou nouveaux)
+            selected.forEach((ing) => {
+                let position;
+                
+                // Si l'ingrédient a déjà une position, la réutiliser
+                if (this.ingredientPositions.has(ing)) {
+                    position = this.ingredientPositions.get(ing);
+                } else {
+                    // Nouvel ingrédient : trouver une place en suivant la gravité
+                    position = this.findPositionForNewIngredient(
+                        ing, 
+                        shelfZones, 
+                        shelfOccupancy, 
+                        containerWidth, 
+                        containerHeight,
+                        chipWidth,
+                        chipHeight,
+                        chipSpacing
+                    );
+                    // Sauvegarder la position
+                    this.ingredientPositions.set(ing, position);
+                }
+                
+                placedItems.push({
+                    ingredient: ing,
+                    x: position.x,
+                    y: position.y,
+                    shelf: position.shelf
+                });
+            });
+
+            // Générer le HTML avec positions absolues (gravité : bottom de l'étagère)
+            overlay.innerHTML = placedItems.map(item => {
+                const zone = shelfZones[item.shelf];
+                // item.y est le TOP de l'ingrédient en % depuis le haut
+                // Pour le bottom CSS, on doit calculer : bottom = 100 - (top + hauteur)
+                const chipHeightPercent = (chipHeight / containerHeight) * 100;
+                const bottomPercent = 100 - (item.y + chipHeightPercent);
+                
+                return `
+                <button 
+                    data-ingredient="${item.ingredient}"
+                    style="position: absolute; left: ${item.x}px; bottom: ${bottomPercent}%; width: ${chipWidth}px; height: ${chipHeight}px;"
+                    class="flex items-center justify-center gap-0.5 rounded-full bg-emerald-100 text-emerald-900 text-[9px] font-medium border border-emerald-300 hover:bg-emerald-200 transition-all shadow-sm z-10 pointer-events-auto">
+                    <span class="truncate px-1 text-[9px]">${this.capitalize(item.ingredient)}</span>
+                    <span class="text-emerald-700 text-[9px] font-bold flex-shrink-0">×</span>
+                </button>
+            `;
+            }).join('');
+
+            // Clicking on a selected chip removes it and updates both lists
+            overlay.querySelectorAll('button[data-ingredient]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const ing = btn.dataset.ingredient;
+                    if (this.selectedIngredients.has(ing)) {
+                        this.selectedIngredients.delete(ing);
+                        this.ingredientPositions.delete(ing); // Supprimer la position aussi
+                        this.renderIngredients();
+                        this.renderSelectedIngredients();
+                    }
+                });
+            });
+        }, 10);
+    }
+
+
+    findPositionForNewIngredient(ingredient, shelfZones, shelfOccupancy, containerWidth, containerHeight, chipWidth, chipHeight, chipSpacing) {
+        const numShelves = shelfZones.length;
+        const chipHeightPercent = (chipHeight / containerHeight) * 100;
+        const spacingPercent = (chipSpacing / containerHeight) * 100;
+        
+        // Créer une liste d'étagères dans un ordre aléatoire
+        const shelfOrder = Array.from({length: numShelves}, (_, i) => i);
+        // Mélanger l'ordre
+        for (let i = shelfOrder.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shelfOrder[i], shelfOrder[j]] = [shelfOrder[j], shelfOrder[i]];
+        }
+        
+        // Essayer chaque étagère dans l'ordre aléatoire
+        for (const shelfIndex of shelfOrder) {
+            const zone = shelfZones[shelfIndex];
+            const leftMargin = containerWidth * (zone.left / 100);
+            const rightMargin = containerWidth * (zone.right / 100);
+            const minX = leftMargin;
+            const maxX = containerWidth - rightMargin - chipWidth;
+            const occupied = shelfOccupancy[shelfIndex];
+            
+            // ÉTAPE 1 : Essayer de placer au bottom sans chevauchement
+            const bottomY = zone.bottom - chipHeightPercent;
+            
+            // Essayer plusieurs positions X aléatoires au bottom
+            for (let attempt = 0; attempt < 50; attempt++) {
+                const testX = minX + Math.random() * (maxX - minX - chipWidth);
+                const testXEnd = testX + chipWidth;
+                
+                // Vérifier qu'il n'y a pas de chevauchement avec les ingrédients existants
+                let canPlace = true;
+                for (const occ of occupied) {
+                    // Vérifier chevauchement horizontal ET vertical
+                    const horizontalOverlap = !(testXEnd <= occ.x || testX >= occ.x + occ.width);
+                    const verticalOverlap = !(bottomY + chipHeightPercent <= occ.y || bottomY >= occ.y + (occ.height || chipHeightPercent));
+                    
+                    if (horizontalOverlap && verticalOverlap) {
+                        canPlace = false;
+                        break;
+                    }
+                }
+                
+                if (canPlace && bottomY >= zone.top) {
+                    // Enregistrer la position occupée
+                    occupied.push({
+                        x: testX,
+                        width: chipWidth,
+                        y: bottomY,
+                        height: chipHeightPercent
+                    });
+                    
+                    return {
+                        x: testX,
+                        y: bottomY,
+                        shelf: shelfIndex
+                    };
+                }
+            }
+            
+            // ÉTAPE 2 : Si pas de place au bottom, essayer d'empiler au-dessus
+            for (let attempt = 0; attempt < 50; attempt++) {
+                const testX = minX + Math.random() * (maxX - minX - chipWidth);
+                const testXEnd = testX + chipWidth;
+                
+                // Trouver tous les ingrédients qui chevauchent horizontalement à cette position X
+                const overlappingItems = occupied.filter(occ => 
+                    !(testXEnd <= occ.x || testX >= occ.x + occ.width)
+                );
+                
+                if (overlappingItems.length > 0) {
+                    // Trouver l'item le plus haut (y le plus petit) pour empiler au-dessus
+                    const topmostItem = overlappingItems.reduce((min, item) => 
+                        item.y < min.y ? item : min
+                    );
+                    
+                    // Empiler au-dessus : position Y = position du plus haut item - hauteur (sans espacement)
+                    const y = topmostItem.y - chipHeightPercent;
+                    
+                    // Vérifier qu'on reste dans la zone et qu'on ne chevauche pas d'autres items
+                    if (y >= zone.top) {
+                        // Vérifier qu'on ne chevauche pas d'autres items à cette position
+                        // L'espacement est déjà pris en compte dans le calcul de y, donc on vérifie normalement
+                        let canStack = true;
+                        for (const occ of occupied) {
+                            if (occ === topmostItem) continue;
+                            
+                            const horizontalOverlap = !(testXEnd <= occ.x || testX >= occ.x + occ.width);
+                            // Vérifier qu'il n'y a pas de chevauchement vertical
+                            // Le bottom du nouvel item (y + chipHeightPercent) doit être <= top de l'item existant (occ.y)
+                            // OU le top du nouvel item (y) doit être >= bottom de l'item existant (occ.y + occ.height)
+                            const verticalOverlap = !(y + chipHeightPercent <= occ.y || y >= occ.y + (occ.height || chipHeightPercent));
+                            
+                            if (horizontalOverlap && verticalOverlap) {
+                                canStack = false;
+                                break;
+                            }
+                        }
+                        
+                        if (canStack) {
+                            // Enregistrer la position occupée
+                            occupied.push({
+                                x: testX,
+                                width: chipWidth,
+                                y: y,
+                                height: chipHeightPercent
+                            });
+                            
+                            return {
+                                x: testX,
+                                y: y,
+                                shelf: shelfIndex
+                            };
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Si aucune place dans aucune étagère, forcer dans la première avec chevauchement
+        const firstShelf = shelfOrder[0];
+        const zone = shelfZones[firstShelf];
+        const leftMargin = containerWidth * (zone.left / 100);
+        const rightMargin = containerWidth * (zone.right / 100);
+        const maxX = containerWidth - rightMargin - chipWidth;
+        const minX = leftMargin;
+        const randomX = minX + Math.random() * (maxX - minX - chipWidth);
+        const y = zone.bottom - chipHeightPercent;
+        
+        const position = {
+            x: Math.max(minX, Math.min(randomX, maxX)),
+            y: y,
+            shelf: firstShelf
+        };
+        
+        shelfOccupancy[firstShelf].push({
+            x: position.x,
+            width: chipWidth,
+            y: position.y,
+            height: chipHeightPercent
         });
+        
+        return position;
     }
 
     setupEventListeners() {
@@ -590,6 +840,7 @@ class SaveEatApp {
         if (!str) return '';
         return str.charAt(0).toUpperCase() + str.slice(1);
     }
+
 }
 
 // Initialize app
