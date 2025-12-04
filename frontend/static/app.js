@@ -1111,6 +1111,34 @@ class SaveEatApp {
         document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
+    removeRecipe(recipeId) {
+        // Find the recipe card element
+        const recipeCard = document.querySelector(`[data-recipe-id="${recipeId}"]`);
+        if (!recipeCard) {
+            console.warn(`Recipe card with ID ${recipeId} not found`);
+            return;
+        }
+
+        // Remove with animation
+        recipeCard.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+        recipeCard.style.opacity = '0';
+        recipeCard.style.transform = 'scale(0.9)';
+
+        setTimeout(() => {
+            recipeCard.remove();
+
+            // Update count
+            const remainingCards = document.querySelectorAll('[data-recipe-id]').length;
+            document.getElementById('resultsCount').textContent = remainingCards;
+
+            // If no recipes left, show empty state
+            if (remainingCards === 0) {
+                document.getElementById('resultsSection').classList.add('hidden');
+                document.getElementById('emptyState').classList.remove('hidden');
+            }
+        }, 300);
+    }
+
     createRecipeCard(recipe) {
         const {
             recipe_id,
@@ -1145,14 +1173,22 @@ class SaveEatApp {
         // Image with fallback
         const imageHTML = image_url ? 
             `<img src="${image_url}" alt="${name}" class="w-full h-48 object-cover" onerror="this.src='https://via.placeholder.com/400x300?text=Save+Eat'">` :
-            `<div class="w-full h-48 bg-gradient-to-br from-green-100 to-blue-100 flex items-center justify-center">
+            `<div class="w-full h-48 bg-green-100 flex items-center justify-center">
                 <svg class="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"></path>
                 </svg>
             </div>`;
 
         return `
-            <div class="recipe-card bg-white rounded-xl shadow-lg overflow-hidden">
+            <div class="recipe-card bg-white rounded-xl shadow-lg overflow-hidden relative" data-recipe-id="${recipe_id}">
+                <!-- Close button (top right) -->
+                <button onclick="app.removeRecipe(${recipe_id})" 
+                        class="absolute top-2 right-2 bg-white rounded-full p-1.5 shadow-lg hover:bg-gray-100 z-10 transition-all opacity-80 hover:opacity-100">
+                    <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+                
                 <!-- Image -->
                 ${imageHTML}
                 
@@ -1217,7 +1253,7 @@ class SaveEatApp {
 
                     <!-- Actions -->
                     <button onclick="app.viewRecipe(${recipe_id})" 
-                            class="w-full bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-all transform hover:scale-[1.02]">
+                            class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-all transform hover:scale-[1.02]">
                         Voir la recette
                     </button>
                 </div>
